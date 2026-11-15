@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="es-MX">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#0f1115">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="description" content="Cinco agentes de IA coordinados: Encargo y chat en grupo, desde tu celular.">
+<title>Enjambre 5</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,400;0,600;0,700;1,400&amp;family=Roboto+Mono:wght@400;600&amp;display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header class="top">
+  <div class="logo"><img src="icons/icon-192.png" alt="" width="28" height="28">Enjambre <b>5</b></div>
+  <div class="top-der">
+    <button id="btnNuevo" class="icono" type="button" aria-label="Nueva charla" title="Nueva charla">＋</button>
+    <button id="btnAjustes" class="icono" type="button" aria-label="Ajustes">⚙</button>
+  </div>
+</header>
+
+<nav class="modos" id="navModos" aria-label="Modos">
+  <button type="button" data-modo="encargo" class="activo">Encargo</button>
+  <button type="button" data-modo="grupo">Grupo</button>
+</nav>
+
+<div class="aviso" id="avisoRed" hidden>📡 Sin internet: puedes leer lo guardado en este teléfono. El enjambre vuelve cuando te conectes.</div>
+
+<main>
+  <section id="vista-encargo" class="vista activo">
+    <div class="cab-modo">
+      <b>Encargo</b>
+      <p class="muted">Escribes una orden. Los 5 agentes la resuelven entre ellos y a ti solo te llega el resultado listo.</p>
+    </div>
+    <div class="vacio" id="encVacio">
+      <b>¿Qué armamos?</b>
+      <span>Toca una idea o escribe tu encargo abajo.</span>
+    </div>
+    <div class="ideas" id="encIdeas"></div>
+    <div class="lista" id="encLista" aria-live="polite"></div>
+  </section>
+
+  <section id="vista-grupo" class="vista">
+    <div class="miembros" id="grpMiembros" aria-label="Integrantes del grupo"></div>
+    <div class="cab-modo corta">
+      <b>Grupo</b>
+      <p class="muted">Chat tipo WhatsApp: cada agente responde por su cuenta. Usa @para hablarle a uno o a @todos.</p>
+    </div>
+    <div class="vacio" id="grpVacio">
+      <b>El grupo está en silencio</b>
+      <span>Escribe algo. Si no mencionas a nadie, contestan los 5, en orden.</span>
+    </div>
+    <div class="lista" id="grpLista" aria-live="polite"></div>
+  </section>
+
+  <section id="vista-ajustes" class="vista">
+    <div class="cab-modo">
+      <b>Ajustes</b>
+      <p class="muted">Tus llaves van cifradas. El PIN es el mismo de Craft Web y solo se pide una vez en este teléfono.</p>
+    </div>
+    <div id="ajPinCaja"></div>
+    <div class="panel">
+      <div class="titulo">Estado de las IAs</div>
+      <div id="ajEstado" class="estado-lista"></div>
+      <button type="button" class="ancho" id="ajProbar">Probar conexión</button>
+      <p class="estado" id="ajProbarEst"></p>
+    </div>
+    <div class="panel">
+      <div class="titulo">Historial en este teléfono</div>
+      <p class="hint">Los encargos y el chat del grupo se guardan solo aquí, no en la nube.</p>
+      <button type="button" class="ancho peligro" id="ajBorrar">Borrar historial</button>
+    </div>
+    <div class="panel">
+      <div class="titulo">Los 5 roles</div>
+      <ul class="roles-info" id="ajRoles"></ul>
+      <p class="hint">Los modelos son abiertos y corren en Groq, que es gratis. Si Groq se satura, entra Pollinations como respaldo (también gratis, sin llave). No se quitan los filtros de seguridad de los modelos.</p>
+    </div>
+    <button type="button" class="ancho" id="ajVolver">Volver</button>
+  </section>
+</main>
+
+<form class="caja" id="cajaForm" autocomplete="off">
+  <div class="menciones" id="cajaMenciones" hidden></div>
+  <div class="caja-fila">
+    <button type="button" class="icono ghost" id="btnPromover" hidden title="Convertir esta charla en un Encargo">▶</button>
+    <textarea id="cajaIn" rows="1" placeholder="Escribe tu encargo…" enterkeyhint="send" aria-label="Mensaje"></textarea>
+    <button class="primario" id="cajaEnviar" type="submit" aria-label="Enviar">➤</button>
+  </div>
+</form>
+
+<script src="js/util.js"></script>
+<script src="js/keys.js"></script>
+<script src="js/ai.js"></script>
+<script src="js/swarm.js"></script>
+<script src="js/grupo.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
