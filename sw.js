@@ -1,8 +1,8 @@
-const V = 'enjambre7-v2';
+const V = 'enjambre7-v3';
 const BASE = [
   './', 'index.html', 'css/style.css',
   'js/util.js', 'js/keys.js', 'js/ai.js', 'js/swarm.js', 'js/grupo.js', 'js/app.js',
-  'manifest.json', 'icons/icon-192.png', 'icons/icon-512.png',
+  'manifest.json', 'bridge-src.txt', 'icons/icon-192.png', 'icons/icon-512.png',
   'img/col-percepcion.webp', 'img/col-razonamiento.webp', 'img/col-supervision.webp', 'img/col-accion.webp', 'img/col-feedback.webp', 'img/col-adaptacion.webp', 'img/col-fallos.webp',
   'img/av-percepcion.webp', 'img/av-razonamiento.webp', 'img/av-supervision.webp', 'img/av-accion.webp', 'img/av-feedback.webp', 'img/av-adaptacion.webp', 'img/av-fallos.webp'
 ];
@@ -18,7 +18,7 @@ self.addEventListener('fetch', e => {
   const u = new URL(e.request.url);
   if (e.request.method !== 'GET') return;
   if (u.origin === location.origin) {
-    if (u.pathname.endsWith('keys.enc.json')) return;
+    if (/(keys\.enc\.json|bridge-url\.json|bridge-src\.txt)$/.test(u.pathname)) return;
     e.respondWith(
       fetch(e.request).then(r => {
         const cp = r.clone();

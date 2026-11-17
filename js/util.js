@@ -210,9 +210,16 @@ function avHTML(rol, extraCls) {
   return '<span class="' + cls + '" style="--c:' + r.color + '">' + escaparHTML(r.inicial || '?') + '</span>';
 }
 
-function modeloCorto(rol) {
+function modeloCorto(rol, modelo, via) {
+  const v = String(via || '').toLowerCase();
+  if (v === 'clow') return 'Clow';
+  if (v === 'hermes') return 'Hermes';
+  const id = (rolDe(rol).id || rol);
+  if ((id === 'accion' || id === 'razonamiento') && (v.startsWith('groq') || v === 'pollinations')) {
+    return v === 'pollinations' ? 'Pollinations (respaldo)' : 'Groq (respaldo)';
+  }
   const r = rolDe(rol);
-  const m = ((typeof AI !== 'undefined' && AI.modeloDe && AI.modeloDe[r.id]) || r.modeloPref || '');
+  const m = modelo || ((typeof AI !== 'undefined' && AI.modeloDe && AI.modeloDe[r.id]) || r.modeloPref || '');
   return String(m).split('/').pop();
 }
 

@@ -29,3 +29,7 @@ Si el formato es texto (haiku, copy, plan), el resultado se queda en texto plano
 - Gestión de Fallos: orquestación (timeout, reintentos, respaldo) y, en el grupo, `openai/gpt-oss-20b`
 
 Si Groq se satura hay reintentos, rotación de llaves y Pollinations como respaldo. Las llaves van cifradas en el repo; nunca en texto claro. Los filtros de seguridad de los modelos se respetan.
+
+## Clow y Hermes (en la computadora de Alfredo)
+
+Acción intenta primero **Clow** (OpenClaw en la caja) y Razonamiento intenta primero **Hermes**. Si no contestan en unos 20 s, o el puente no está publicado, el sitio usa Groq de respaldo. El secreto del puente va cifrado con el mismo PIN; la URL pública se descubre sola (sin el secreto). En la interfaz verás la etiqueta *Clow*, *Hermes* o *Groq (respaldo)*.

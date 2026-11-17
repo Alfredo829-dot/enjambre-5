@@ -152,7 +152,8 @@ const App = {
     const d = document.createElement('details');
     d.className = 'paso ' + (p.estado || '');
     d.dataset.pid = p.id;
-    d.innerHTML = `<summary>${avHTML(p.rol, 'av-sm')}<span class="punto"></span><span class="paso-tit">${escaparHTML(p.titulo || r.nombre)}</span>${p.resumen ? `<span class="resumen">${escaparHTML(p.resumen)}</span>` : ''}</summary><div class="paso-cuerpo"><pre>${escaparHTML(p.detalle || (p.estado === 'run' ? '…' : ''))}</pre></div>`;
+    const badge = (p.modelo || p.via) ? `<span class="cm-badge">${escaparHTML(modeloCorto(p.rol, p.modelo, p.via))}</span>` : '';
+    d.innerHTML = `<summary>${avHTML(p.rol, 'av-sm')}<span class="punto"></span><span class="paso-tit">${escaparHTML(p.titulo || r.nombre)}</span>${p.resumen ? `<span class="resumen">${escaparHTML(p.resumen)}</span>` : ''}${badge}</summary><div class="paso-cuerpo"><pre>${escaparHTML(p.detalle || (p.estado === 'run' ? '…' : ''))}</pre></div>`;
     if (p.estado === 'run' || p.estado === 'fail' || p.abrir || p.rol === 'percepcion') d.open = true;
     return d;
   },
@@ -174,6 +175,16 @@ const App = {
         }
         res.textContent = paso.resumen;
       } else if (res) res.textContent = '';
+      if (paso.modelo || paso.via) {
+        let b = el.querySelector('summary .cm-badge');
+        const txt = modeloCorto(paso.rol, paso.modelo, paso.via);
+        if (!b) {
+          b = document.createElement('span');
+          b.className = 'cm-badge';
+          el.querySelector('summary').appendChild(b);
+        }
+        b.textContent = txt;
+      }
       const pre = el.querySelector('pre');
       if (pre) pre.textContent = paso.detalle || (paso.estado === 'run' ? '…' : '');
       if (paso.estado === 'run' || paso.estado === 'fail' || paso.abrir || paso.rol === 'percepcion') el.open = true;
@@ -250,7 +261,7 @@ const App = {
     el.dataset.mid = m.id || '';
     const nom = esYo ? 'Alfredo' : (r && r.nombre) || m.rol;
     const rol = esYo ? 'tú' : ((r && r.corto) || '');
-    const badge = (!esYo && !m.temp && (m.modelo || (r && r.modeloPref))) ? `<span class="cm-badge">${escaparHTML(modeloCorto(m.rol))}</span>` : '';
+    const badge = (!esYo && !m.temp && (m.modelo || m.via || (r && r.modeloPref))) ? `<span class="cm-badge">${escaparHTML(modeloCorto(m.rol, m.modelo, m.via))}</span>` : '';
     const cuerpo = m.temp
       ? `<span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>pensando…`
       : pintarMenciones(m.texto || '');
@@ -428,7 +439,7 @@ const App = {
             const n = $('#grpLista').querySelector(`[data-mid="${tmp.id}"]`);
             if (n) n.remove();
           }
-          const msg = { id: uid(), when: Date.now(), rol: item.rol, texto: item.texto, modelo: item.modelo };
+          const msg = { id: uid(), when: Date.now(), rol: item.rol, texto: item.texto, modelo: item.modelo, via: item.via };
           this.grupo.push(msg);
           $('#grpLista').appendChild(this.nodoMsg(msg));
           window.__e5ultimoGrupo.respuestas.push({ rol: item.rol, ok: true, chars: (item.texto || '').length, ms: item.ms, ttft: item.ttft, modelo: item.modelo, via: item.via });
@@ -647,6 +658,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   App.ir(modo);
   await Llaves.iniciar();
   if (AI.nLlaves()) await AI.verificarModelos();
+  try { await AI.descubrirPuente(); } catch (e) {}
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === '127.0.0.1' || location.hostname === 'localhost')) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }

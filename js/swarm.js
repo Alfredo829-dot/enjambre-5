@@ -72,8 +72,12 @@ const Swarm = {
       error: null, modelos: {}, entrega: 'texto', score: null, bloqueado: false, profundo: !!profundo,
     };
     const emitir = (paso) => {
+      if ((!paso.modelo || !paso.via) && historial.ultimo && historial.ultimo.rol === paso.rol) {
+        paso.modelo = paso.modelo || historial.ultimo.modelo;
+        paso.via = paso.via || historial.ultimo.via;
+      }
       const i = historial.pasos.findIndex(x => x.id === paso.id);
-      if (i >= 0) historial.pasos[i] = paso;
+      if (i >= 0) historial.pasos[i] = { ...historial.pasos[i], ...paso };
       else historial.pasos.push(paso);
       if (onPaso) onPaso(paso, historial);
     };
@@ -103,6 +107,7 @@ const Swarm = {
       });
       historial.modelos[rol] = out.modelo + (out.via === 'pollinations' ? ' (respaldo)' : '');
       historial.latencias.push({ rol, ms: out.ms, ttft: out.ttft, modelo: out.modelo, via: out.via, tokens: out.tokens });
+      historial.ultimo = { rol, modelo: out.modelo, via: out.via };
       return out;
     };
 

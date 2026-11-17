@@ -8,8 +8,16 @@ const Llaves = {
       const r = await fetch('keys.enc.json', { cache: 'no-store' });
       if (r.ok) { this.datos = await r.json(); this.hay = true; }
     } catch (e) {}
-    if (this.hay && localStorage.getItem('e5_llaves') !== '1' && localStorage.getItem('e5_llaves_omitir') !== '1') {
-      this.pedir(false);
+    if (this.hay) {
+      const k = (typeof AI !== 'undefined' && AI.claves) ? AI.claves() : {};
+      const nGroq = (typeof AI !== 'undefined' && AI.nLlaves) ? AI.nLlaves() : 0;
+      const faltaPuente = !k.puente;
+      const faltaLlaves = nGroq < 8;
+      const desbloqueado = localStorage.getItem('e5_llaves') === '1';
+      const falta = faltaPuente || faltaLlaves;
+      if ((!desbloqueado && localStorage.getItem('e5_llaves_omitir') !== '1') || (desbloqueado && falta && localStorage.getItem('e5_llaves_act_omitir') !== '1')) {
+        this.pedir(false, { actualizacion: !!(desbloqueado && falta) });
+      }
     }
   },
   async descifrar(pin) {
@@ -28,21 +36,26 @@ const Llaves = {
   },
   aplicar(j) {
     const k = AI.claves();
+    const ids = ['groq', 'groq2', 'groq3', 'groq4', 'groq5', 'groq6', 'groq7', 'groq8'];
+    ids.forEach(id => { delete k[id]; });
     (j.groq || []).forEach((g, i) => {
-      const id = ['groq', 'groq2', 'groq3'][i];
-      if (id && g && !k[id]) k[id] = g;
+      const id = ids[i];
+      if (id && g) k[id] = g;
     });
+    if (j.puente) k.puente = j.puente;
     AI.guardarClaves(k);
     localStorage.setItem('e5_llaves', '1');
+    localStorage.removeItem('e5_puente_omitir');
+    localStorage.removeItem('e5_llaves_act_omitir');
     return (j.groq || []).length;
   },
-  pedir(desdeAjustes) {
+  pedir(desdeAjustes, extra = {}) {
     if ($('#pinModal')) return;
     const m = document.createElement('div');
     m.className = 'visor centrado';
     m.id = 'pinModal';
     m.innerHTML = `<div class="visor-caja panel"><div class="titulo">🔑 Escribe tu PIN</div>
-      <p class="hint">Con tu PIN de 6 números activas tus llaves de Groq en este teléfono. Es el mismo de Craft Web. Solo te lo pido una vez.</p>
+      <p class="hint">${extra.actualizacion ? 'Hay una actualización de llaves: más llaves de Groq y el puente privado a Clow y Hermes. Es el mismo PIN de 6 números de Craft Web.' : 'Con tu PIN de 6 números activas tus llaves de Groq y el puente a Clow/Hermes en este teléfono. Es el mismo de Craft Web. Solo se pide una vez.'}</p>
       <input type="password" id="pinInput" inputmode="numeric" maxlength="6" placeholder="••••••" autocomplete="off" style="font-size:26px;text-align:center;letter-spacing:10px">
       <div class="estado" id="pinEstado"></div>
       <div class="grid2"><button class="primario" id="pinOk" type="button">Desbloquear</button><button id="pinNo" type="button">Ahora no</button></div></div>`;
@@ -57,7 +70,7 @@ const Llaves = {
         const j = await this.descifrar(pin);
         const n = this.aplicar(j);
         m.remove();
-        toast(`🔓 Listo: ${n} llaves de Groq activadas`);
+        toast('🔓 Listo: ' + n + ' llaves de Groq' + (j.puente ? ' y puente Clow/Hermes' : ''));
         document.dispatchEvent(new Event('e5-llaves'));
       } catch (e) {
         intentos++;
@@ -75,6 +88,10 @@ const Llaves = {
     };
     $('#pinNo').onclick = () => {
       localStorage.setItem('e5_llaves_omitir', '1');
+      if (extra.actualizacion) {
+        localStorage.setItem('e5_puente_omitir', '1');
+        localStorage.setItem('e5_llaves_act_omitir', '1');
+      }
       m.remove();
       if (!desdeAjustes) toast('Puedes activarlas después en ⚙ Ajustes');
     };

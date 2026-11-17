@@ -7,7 +7,7 @@ const ROLES = {
     mention: ['percepción', 'percepcion', 'perception'],
     modeloPref: 'openai/gpt-oss-20b',
     respaldo: 'openai/gpt-oss-120b',
-    keyPref: ['groq', 'groq3', 'groq2'],
+    keyPref: ['groq', 'groq8', 'groq2', 'groq3', 'groq4', 'groq5', 'groq6', 'groq7'],
     razonamiento: 'low',
     color: '#22d3ee',
     fw: 223,
@@ -22,7 +22,7 @@ const ROLES = {
     mention: ['razonamiento', 'razón', 'razon', 'estratega', 'strategist', 'arquitecto', 'architect'],
     modeloPref: 'openai/gpt-oss-120b',
     respaldo: 'openai/gpt-oss-20b',
-    keyPref: ['groq2', 'groq', 'groq3'],
+    keyPref: ['groq2', 'groq8', 'groq3', 'groq4', 'groq5', 'groq6', 'groq7', 'groq'],
     razonamiento: 'low',
     color: '#8b5cf6',
     fw: 145,
@@ -37,7 +37,7 @@ const ROLES = {
     mention: ['supervisión', 'supervision', 'supervisor'],
     modeloPref: 'openai/gpt-oss-20b',
     respaldo: 'openai/gpt-oss-120b',
-    keyPref: ['groq3', 'groq', 'groq2'],
+    keyPref: ['groq3', 'groq8', 'groq4', 'groq5', 'groq6', 'groq7', 'groq', 'groq2'],
     razonamiento: 'low',
     color: '#eab308',
     fw: 173,
@@ -52,7 +52,7 @@ const ROLES = {
     mention: ['acción', 'accion', 'action', 'ejecutor', 'executor'],
     modeloPref: 'qwen/qwen3.8-27b',
     respaldo: 'openai/gpt-oss-20b',
-    keyPref: ['groq2', 'groq3', 'groq'],
+    keyPref: ['groq4', 'groq8', 'groq5', 'groq6', 'groq7', 'groq', 'groq2', 'groq3'],
     razonamiento: null,
     color: '#22c55e',
     fw: 207,
@@ -67,7 +67,7 @@ const ROLES = {
     mention: ['feedback', 'crítico', 'critico', 'analista', 'qa', 'critic'],
     modeloPref: 'openai/gpt-oss-120b',
     respaldo: 'openai/gpt-oss-20b',
-    keyPref: ['groq', 'groq3', 'groq2'],
+    keyPref: ['groq5', 'groq8', 'groq6', 'groq7', 'groq', 'groq2', 'groq3', 'groq4'],
     razonamiento: 'low',
     color: '#f97316',
     fw: 169,
@@ -82,7 +82,7 @@ const ROLES = {
     mention: ['adaptación', 'adaptacion', 'expansor', 'creativo'],
     modeloPref: 'allam-2-7b',
     respaldo: 'openai/gpt-oss-20b',
-    keyPref: ['groq3', 'groq2', 'groq'],
+    keyPref: ['groq6', 'groq8', 'groq7', 'groq', 'groq2', 'groq3', 'groq4', 'groq5'],
     razonamiento: null,
     color: '#ec4899',
     fw: 173,
@@ -98,7 +98,7 @@ const ROLES = {
     mention: ['fallos', 'fallas', 'gestión', 'gestion', 'controlador', 'sincronizador', 'sync'],
     modeloPref: 'openai/gpt-oss-20b',
     respaldo: 'openai/gpt-oss-120b',
-    keyPref: ['groq3', 'groq', 'groq2'],
+    keyPref: ['groq7', 'groq8', 'groq', 'groq2', 'groq3', 'groq4', 'groq5', 'groq6'],
     razonamiento: 'low',
     color: '#f43f5e',
     fw: 172,
@@ -194,10 +194,20 @@ const AI = {
   timeoutMs: 16000,
   timeoutRespaldoMs: 12000,
   timeoutPollMs: 10000,
+  timeoutPuenteMs: 20000,
+  timeoutPuentePingMs: 2500,
+  puenteUrl: '',
+  puenteVivo: false,
+  puenteHasta: 0,
+
+
+  idsGroq() {
+    const k = this.claves();
+    return ['groq', 'groq2', 'groq3', 'groq4', 'groq5', 'groq6', 'groq7', 'groq8'].filter(id => !!k[id]);
+  },
 
   nLlaves() {
-    const k = this.claves();
-    return ['groq', 'groq2', 'groq3'].filter(id => !!k[id]).length;
+    return this.idsGroq().length;
   },
 
   async _json(url, opts, signal) {
@@ -379,6 +389,95 @@ const AI = {
     return { texto: txt, modelo: 'pollinations', via: 'pollinations', tokens: this._tokens(j) };
   },
 
+  async descubrirPuente() {
+    const candidatos = [];
+    if (typeof location !== 'undefined' && (location.hostname === '127.0.0.1' || location.hostname === 'localhost')) {
+      candidatos.push({ url: 'http://127.0.0.1:18892', local: true });
+    }
+    try {
+      const r = await fetch('bridge-url.json?t=' + Date.now(), { cache: 'no-store' });
+      if (r.ok) {
+        const j = await r.json();
+        if (j && j.status === 'down') { /* sigue al gist por si acaso */ }
+        else if (j && j.url) candidatos.push({ url: String(j.url).replace(/\/$/, '') });
+      }
+    } catch (e) {}
+    try {
+      const r = await fetch('bridge-src.txt', { cache: 'no-store' });
+      if (r.ok) {
+        const src = (await r.text()).trim().split(/\s+/)[0];
+        if (src) {
+          const g = await fetch(src + (src.includes('?') ? '&' : '?') + 't=' + Date.now(), { cache: 'no-store' });
+          if (g.ok) {
+            const j = await g.json();
+            if (j && j.url && j.status !== 'down') candidatos.push({ url: String(j.url).replace(/\/$/, '') });
+          }
+        }
+      }
+    } catch (e) {}
+    this.puenteUrl = (candidatos[0] && candidatos[0].url) || '';
+    this.puenteVivo = false;
+    this.puenteHasta = 0;
+    return this.puenteUrl;
+  },
+
+  async pingPuente(base) {
+    const url = (base || this.puenteUrl || '').replace(/\/$/, '');
+    if (!url) return false;
+    const env = senalConTimeout(null, this.timeoutPuentePingMs);
+    try {
+      const r = await fetch(url + '/ping', { signal: env.signal, cache: 'no-store' });
+      return r.ok;
+    } catch (e) {
+      return false;
+    } finally {
+      env.cleanup();
+    }
+  },
+
+  async _puente({ dest, mensajes, signal, onDelta, timeout, secret }) {
+    if (!secret) throw new Error('falta el secreto del puente (desbloquea con tu PIN)');
+    if (!this.puenteUrl) await this.descubrirPuente();
+    if (!this.puenteUrl) throw new Error('puente no publicado');
+    if (this.puenteHasta < Date.now()) {
+      const ok = await this.pingPuente();
+      this.puenteVivo = ok;
+      this.puenteHasta = Date.now() + (ok ? 30000 : 20000);
+      if (!ok) throw new Error('puente no alcanza');
+    } else if (!this.puenteVivo) {
+      throw new Error('puente no alcanza');
+    }
+    const env = senalConTimeout(signal, timeout || this.timeoutPuenteMs);
+    try {
+      const r = await fetch(this.puenteUrl.replace(/\/$/, '') + '/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + secret },
+        body: JSON.stringify({ model: dest, messages: mensajes }),
+        signal: env.signal,
+      });
+      const raw = await r.text();
+      if (r.status === 401) throw new Error('puente no autorizado');
+      if (!r.ok) {
+        let msg = 'puente HTTP ' + r.status;
+        try { msg = (JSON.parse(raw).error) || msg; } catch (e) {}
+        throw new Error(msg);
+      }
+      const j = JSON.parse(raw);
+      const txt = this._limpia(j);
+      if (!txt) throw new Error('puente vacío');
+      if (onDelta) onDelta({ texto: txt, pieza: txt, ttft: 0 });
+      return {
+        texto: txt,
+        modelo: dest === 'clow' ? 'Clow' : 'Hermes',
+        via: dest,
+        tokens: this._tokens(j),
+        ttft: (j.enjambre && j.enjambre.ms) || undefined,
+      };
+    } finally {
+      env.cleanup();
+    }
+  },
+
   async completar({ rol, mensajes, maxTokens = 800, temp = 0.3, signal, modeloForzar, timeout, onDelta }) {
     const meta = typeof rol === 'string' ? (ROLES[rol] || ROLES[ALIAS_ROL[rol]]) : rol;
     if (!meta) throw new Error('Rol desconocido');
@@ -388,6 +487,31 @@ const AI = {
     const modelos = this.cadenaModelos(meta, modeloForzar);
     const t0 = Date.now();
     let tokens = 0;
+
+    if (!modeloForzar && (meta.id === 'accion' || meta.id === 'razonamiento')) {
+      const dest = meta.id === 'accion' ? 'clow' : 'hermes';
+      try {
+        const out = await this._puente({
+          dest, mensajes, signal, onDelta,
+          timeout: timeout || this.timeoutPuenteMs,
+          secret: k.puente,
+        });
+        if (out && out.texto) {
+          out.ms = Date.now() - t0;
+          out.rol = meta.id;
+          this.estado[dest] = 'ok';
+          Metricas.rec(meta.id, { ms: out.ms, tokens: out.tokens || 0, error: false });
+          return out;
+        }
+      } catch (e) {
+        if (signal && signal.aborted) throw new Error('cancelado');
+        FallosLog.registrar({
+          rol: meta.id, tipo: 'puente',
+          detalle: (e && e.message) || 'Clow/Hermes no alcanzaron',
+          accion: 'respaldo Groq',
+        });
+      }
+    }
 
     const unIntento = async (mod, keyId, to) => {
       const env = senalConTimeout(signal, to);
@@ -522,7 +646,7 @@ const AI = {
 
   async verificarModelos(signal) {
     const k = this.claves();
-    const id = ['groq', 'groq2', 'groq3'].find(x => k[x] && !((this.pausa[x] || 0) > Date.now()));
+    const id = this.idsGroq().find(x => !((this.pausa[x] || 0) > Date.now())) || this.idsGroq()[0];
     if (!id) return;
     try {
       const j = await this._json('https://api.groq.com/openai/v1/models', {
