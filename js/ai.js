@@ -7,7 +7,7 @@ const ROLES = {
     mention: ['percepción', 'percepcion', 'perception'],
     modeloPref: 'openai/gpt-oss-20b',
     respaldo: 'openai/gpt-oss-120b',
-    keyPref: ['groq', 'groq8', 'groq2', 'groq3', 'groq4', 'groq5', 'groq6', 'groq7'],
+    keyPref: ['groq', 'groq8', 'groq11', 'groq2', 'groq12', 'groq3', 'groq9', 'groq4', 'groq10', 'groq5', 'groq6', 'groq7'],
     razonamiento: 'low',
     color: '#22d3ee',
     fw: 223,
@@ -22,7 +22,7 @@ const ROLES = {
     mention: ['razonamiento', 'razón', 'razon', 'estratega', 'strategist', 'arquitecto', 'architect'],
     modeloPref: 'openai/gpt-oss-120b',
     respaldo: 'openai/gpt-oss-20b',
-    keyPref: ['groq2', 'groq8', 'groq3', 'groq4', 'groq5', 'groq6', 'groq7', 'groq'],
+    keyPref: ['groq2', 'groq9', 'groq8', 'groq11', 'groq3', 'groq12', 'groq4', 'groq10', 'groq5', 'groq6', 'groq7', 'groq'],
     razonamiento: 'low',
     color: '#8b5cf6',
     fw: 145,
@@ -37,7 +37,7 @@ const ROLES = {
     mention: ['supervisión', 'supervision', 'supervisor'],
     modeloPref: 'openai/gpt-oss-20b',
     respaldo: 'openai/gpt-oss-120b',
-    keyPref: ['groq3', 'groq8', 'groq4', 'groq5', 'groq6', 'groq7', 'groq', 'groq2'],
+    keyPref: ['groq3', 'groq8', 'groq12', 'groq4', 'groq9', 'groq5', 'groq10', 'groq6', 'groq11', 'groq7', 'groq', 'groq2'],
     razonamiento: 'low',
     color: '#eab308',
     fw: 173,
@@ -52,7 +52,7 @@ const ROLES = {
     mention: ['acción', 'accion', 'action', 'ejecutor', 'executor'],
     modeloPref: 'qwen/qwen3.8-27b',
     respaldo: 'openai/gpt-oss-20b',
-    keyPref: ['groq4', 'groq8', 'groq5', 'groq6', 'groq7', 'groq', 'groq2', 'groq3'],
+    keyPref: ['groq4', 'groq10', 'groq8', 'groq12', 'groq5', 'groq9', 'groq6', 'groq11', 'groq7', 'groq', 'groq2', 'groq3'],
     razonamiento: null,
     color: '#22c55e',
     fw: 207,
@@ -67,7 +67,7 @@ const ROLES = {
     mention: ['feedback', 'crítico', 'critico', 'analista', 'qa', 'critic'],
     modeloPref: 'openai/gpt-oss-120b',
     respaldo: 'openai/gpt-oss-20b',
-    keyPref: ['groq5', 'groq8', 'groq6', 'groq7', 'groq', 'groq2', 'groq3', 'groq4'],
+    keyPref: ['groq5', 'groq8', 'groq11', 'groq6', 'groq12', 'groq7', 'groq9', 'groq', 'groq10', 'groq2', 'groq3', 'groq4'],
     razonamiento: 'low',
     color: '#f97316',
     fw: 169,
@@ -82,7 +82,7 @@ const ROLES = {
     mention: ['adaptación', 'adaptacion', 'expansor', 'creativo'],
     modeloPref: 'allam-2-7b',
     respaldo: 'openai/gpt-oss-20b',
-    keyPref: ['groq6', 'groq8', 'groq7', 'groq', 'groq2', 'groq3', 'groq4', 'groq5'],
+    keyPref: ['groq6', 'groq8', 'groq12', 'groq7', 'groq9', 'groq', 'groq10', 'groq2', 'groq11', 'groq3', 'groq4', 'groq5'],
     razonamiento: null,
     color: '#ec4899',
     fw: 173,
@@ -98,7 +98,7 @@ const ROLES = {
     mention: ['fallos', 'fallas', 'gestión', 'gestion', 'controlador', 'sincronizador', 'sync'],
     modeloPref: 'openai/gpt-oss-20b',
     respaldo: 'openai/gpt-oss-120b',
-    keyPref: ['groq7', 'groq8', 'groq', 'groq2', 'groq3', 'groq4', 'groq5', 'groq6'],
+    keyPref: ['groq7', 'groq8', 'groq11', 'groq', 'groq12', 'groq2', 'groq9', 'groq3', 'groq10', 'groq4', 'groq5', 'groq6'],
     razonamiento: 'low',
     color: '#f43f5e',
     fw: 172,
@@ -203,7 +203,7 @@ const AI = {
 
   idsGroq() {
     const k = this.claves();
-    return ['groq', 'groq2', 'groq3', 'groq4', 'groq5', 'groq6', 'groq7', 'groq8'].filter(id => !!k[id]);
+    return ['groq', 'groq2', 'groq3', 'groq4', 'groq5', 'groq6', 'groq7', 'groq8', 'groq9', 'groq10', 'groq11', 'groq12'].filter(id => !!k[id]);
   },
 
   nLlaves() {

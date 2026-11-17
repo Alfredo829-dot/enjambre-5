@@ -1,4 +1,4 @@
-const V = 'enjambre7-v3';
+const V = 'enjambre7-v4';
 const BASE = [
   './', 'index.html', 'css/style.css',
   'js/util.js', 'js/keys.js', 'js/ai.js', 'js/swarm.js', 'js/grupo.js', 'js/app.js',

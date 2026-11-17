@@ -12,7 +12,7 @@ const Llaves = {
       const k = (typeof AI !== 'undefined' && AI.claves) ? AI.claves() : {};
       const nGroq = (typeof AI !== 'undefined' && AI.nLlaves) ? AI.nLlaves() : 0;
       const faltaPuente = !k.puente;
-      const faltaLlaves = nGroq < 8;
+      const faltaLlaves = nGroq < 12;
       const desbloqueado = localStorage.getItem('e5_llaves') === '1';
       const falta = faltaPuente || faltaLlaves;
       if ((!desbloqueado && localStorage.getItem('e5_llaves_omitir') !== '1') || (desbloqueado && falta && localStorage.getItem('e5_llaves_act_omitir') !== '1')) {
@@ -36,7 +36,7 @@ const Llaves = {
   },
   aplicar(j) {
     const k = AI.claves();
-    const ids = ['groq', 'groq2', 'groq3', 'groq4', 'groq5', 'groq6', 'groq7', 'groq8'];
+    const ids = ['groq', 'groq2', 'groq3', 'groq4', 'groq5', 'groq6', 'groq7', 'groq8', 'groq9', 'groq10', 'groq11', 'groq12'];
     ids.forEach(id => { delete k[id]; });
     (j.groq || []).forEach((g, i) => {
       const id = ids[i];
