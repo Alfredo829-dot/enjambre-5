@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#07040f">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="description" content="Cinco agentes de IA coordinados: Encargo y chat en grupo, desde tu celular.">
-<title>Enjambre 5</title>
+<meta name="description" content="Siete agentes de IA coordinados: Encargo y chat en grupo, desde tu celular.">
+<title>Enjambre 7</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -17,7 +17,7 @@
 </head>
 <body>
 <header class="top">
-  <div class="logo"><img src="icons/icon-192.png" alt="" width="28" height="28">Enjambre <b>5</b></div>
+  <div class="logo"><img src="icons/icon-192.png" alt="" width="28" height="28">Enjambre <b>7</b></div>
   <div class="top-der">
     <button id="btnNuevo" class="icono" type="button" aria-label="Nueva charla" title="Nueva charla">＋</button>
     <button id="btnAjustes" class="icono" type="button" aria-label="Ajustes">⚙</button>
@@ -29,18 +29,24 @@
   <button type="button" data-modo="grupo">Grupo</button>
 </nav>
 
-<section class="equipo-bar" id="equipoBar" aria-label="Los 5 agentes">
+<section class="equipo-bar" id="equipoBar" aria-label="Los 7 agentes">
   <div class="equipo-foto" id="equipoFoto"></div>
 </section>
 
 <div class="aviso" id="avisoRed" hidden>📡 Sin internet: puedes leer lo guardado en este teléfono. El enjambre vuelve cuando te conectes.</div>
 
+<aside class="panel-fallos" id="panelFallos" hidden>
+  <button type="button" class="fallos-cab" id="btnFallosCab" aria-expanded="false">Gestión de Fallos <span id="fallosN">0</span></button>
+  <div class="fallos-lista" id="fallosLista" hidden></div>
+</aside>
+
 <main>
   <section id="vista-encargo" class="vista activo">
     <div class="cab-modo" id="encCab">
       <b>Encargo</b>
-      <p class="muted">Escribes una orden. El Estratega elige el camino, los 5 la resuelven entre ellos y a ti solo te llega el resultado listo.</p>
+      <p class="muted">Escribes una orden. Los 7 agentes la resuelven en cadena: entienden, planean, validan, ejecutan, puntúan y pulen. Si el plan no se sostiene, Supervisión lo bloquea.</p>
     </div>
+    <label class="toggle-fila" id="filaProfundo"><input type="checkbox" id="chkProfundo"> Análisis profundo <span class="hint-inline">— una pasada extra de refinamiento en el plan y en el entregable. Tarda más y hace más llamadas; no es un “análisis ×5” automático.</span></label>
     <div class="vacio" id="encVacio">
       <b>¿Qué armamos?</b>
       <span>Toca una idea o escribe tu encargo abajo.</span>
@@ -52,11 +58,11 @@
   <section id="vista-grupo" class="vista">
     <div class="cab-modo corta" id="grpCab">
       <b>Grupo</b>
-      <p class="muted">Toca a un agente para mencionarlo, o escribe @todos. Cada uno responde por su cuenta.</p>
+      <p class="muted">Toca a un agente para mencionarlo, o escribe @todos. Cada uno responde por su cuenta. @Estratega sigue llegando a Razonamiento.</p>
     </div>
     <div class="vacio" id="grpVacio">
       <b>El grupo está en silencio</b>
-      <span>Escribe algo. Si no mencionas a nadie, contestan los 5, en orden.</span>
+      <span>Escribe algo. Si no mencionas a nadie, contestan los 7, en orden.</span>
     </div>
     <div class="lista" id="grpLista" aria-live="polite"></div>
   </section>
@@ -74,12 +80,18 @@
       <p class="estado" id="ajProbarEst"></p>
     </div>
     <div class="panel">
+      <div class="titulo">Métricas por agente</div>
+      <p class="hint">Llamadas, errores, latencia promedio, tokens e iteraciones de análisis de esta sesión (y de los encargos que corras ahora).</p>
+      <div class="tabla-wrap"><table class="metricas" id="ajMetricas"></table></div>
+      <button type="button" class="ancho" id="ajCsv">Exportar métricas CSV</button>
+    </div>
+    <div class="panel">
       <div class="titulo">Historial en este teléfono</div>
       <p class="hint">Los encargos y el chat del grupo se guardan solo aquí, no en la nube.</p>
       <button type="button" class="ancho peligro" id="ajBorrar">Borrar historial</button>
     </div>
     <div class="panel">
-      <div class="titulo">Los 5 roles</div>
+      <div class="titulo">Los 7 roles</div>
       <ul class="roles-info" id="ajRoles"></ul>
       <p class="hint">Los modelos son abiertos y corren en Groq, que es gratis. Si Groq se satura, entra Pollinations como respaldo (también gratis, sin llave). No se quitan los filtros de seguridad de los modelos.</p>
     </div>
@@ -91,9 +103,12 @@
   <div class="menciones" id="cajaMenciones" hidden></div>
   <div class="caja-fila">
     <button type="button" class="icono ghost" id="btnPromover" hidden title="Convertir esta charla en un Encargo">▶</button>
+    <button type="button" class="icono ghost" id="btnAdjunto" title="Adjuntar texto o una imagen (se usa la descripción, no hay visión automática)">📎</button>
+    <input type="file" id="inAdjunto" hidden accept="text/plain,text/markdown,text/csv,application/json,image/*">
     <textarea id="cajaIn" rows="1" placeholder="Escribe tu encargo…" enterkeyhint="send" aria-label="Mensaje"></textarea>
     <button class="primario" id="cajaEnviar" type="submit" aria-label="Enviar">➤</button>
   </div>
+  <p class="adjunto-nom" id="adjuntoNom" hidden></p>
 </form>
 
 <script src="js/util.js"></script>

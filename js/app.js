@@ -6,6 +6,7 @@ const App = {
   grupo: [],
   pasosUI: {},
   estadoRol: {},
+  adjunto: null,
 
   cargar() {
     try { this.encargos = JSON.parse(localStorage.getItem('e5_encargos') || '[]'); } catch (e) { this.encargos = []; }
@@ -14,7 +15,8 @@ const App = {
   guardarEncargos() {
     const recorte = this.encargos.slice(-30).map(e => ({
       id: e.id, when: e.when, orden: e.orden, resultado: e.resultado,
-      artefacto: e.artefacto, entrega: e.entrega, error: e.error, veredictos: e.veredictos,
+      artefacto: e.artefacto, entrega: e.entrega, score: e.score, bloqueado: e.bloqueado,
+      error: e.error, veredictos: e.veredictos,
       rondas: e.rondas, pasos: (e.pasos || []).map(p => ({
         id: p.id, rol: p.rol, estado: p.estado, titulo: p.titulo,
         resumen: p.resumen, detalle: String(p.detalle || '').slice(0, 4000),
@@ -82,7 +84,7 @@ const App = {
       return `<button type="button" class="bot-col${trab}" data-rol="${id}" style="--c:${r.color}" aria-label="${escaparHTML(r.nombre + ', ' + r.corto)}">
         <span class="bot-frame"><img src="${r.col}" alt=""></span>
         <span class="bot-meta">
-          <span class="bot-nom">${escaparHTML(r.nombre)}</span>
+          <span class="bot-nom">${escaparHTML(r.nombreCorto || r.nombre)}</span>
           <span class="bot-linea"></span>
           <span class="bot-st" data-st="${st}">${escaparHTML(stTxt)}</span>
         </span>
@@ -93,7 +95,7 @@ const App = {
     });
   },
   setEstadoRol(id, st) {
-    id = (id === 'arquitecto') ? 'estratega' : id;
+    id = rolDe(id).id;
     if (id && ROLES[id]) this.estadoRol[id] = st;
     const col = id && $(`#equipoFoto .bot-col[data-rol="${id}"]`);
     if (!col) return;
@@ -136,7 +138,7 @@ const App = {
     pasos.id = 'pasos-' + run.id;
     (run.pasos || []).forEach(p => pasos.appendChild(this.nodoPaso(p)));
     el.appendChild(pasos);
-    if (run.resultado || run.error) el.appendChild(this.nodoResultado(run));
+    if (run.resultado || run.error || run.bloqueado) el.appendChild(this.nodoResultado(run));
     return el;
   },
   _ordenNodo(run) {
@@ -163,13 +165,17 @@ const App = {
   },
   nodoResultado(run) {
     const box = document.createElement('div');
-    box.className = 'resultado' + (run.error && !run.resultado ? ' err' : '');
+    const bloqueado = !!run.bloqueado;
+    box.className = 'resultado' + ((run.error && !run.resultado) || bloqueado ? ' err' : '') + (bloqueado ? ' bloqueado' : '');
     const entrega = run.entrega || (run.artefacto && run.artefacto.tipo) || '';
     const art = run.artefacto && run.artefacto.tipo ? run.artefacto : extraerArtefacto(run.resultado || '', entrega);
-    const k = run.error && !run.resultado ? 'NO SE PUDO COMPLETAR' : 'RESULTADO';
-    const texto = (art && art.tipo === 'texto' && art.contenido) ? art.contenido : (run.resultado || run.error || '');
-    box.innerHTML = `<div class="k">${k}</div><div class="t">${escaparHTML(texto)}</div>`;
-    if (art && art.tipo === 'html' && entrega !== 'texto' && art.contenido) {
+    const k = bloqueado ? 'SUPERVISIÓN BLOQUEÓ EL PLAN' : (run.error && !run.resultado ? 'NO SE PUDO COMPLETAR' : 'RESULTADO');
+    const esHtml = !bloqueado && art && art.tipo === 'html' && entrega !== 'texto' && art.contenido;
+    const texto = bloqueado
+      ? (run.error || 'El plan no se aprobó.')
+      : (esHtml ? '' : ((art && art.contenido) ? art.contenido : (run.resultado || run.error || '')));
+    box.innerHTML = `<div class="k">${k}</div>` + (texto ? `<div class="t">${escaparHTML(texto)}</div>` : '');
+    if (esHtml) {
       const prev = document.createElement('div');
       prev.className = 'previa';
       prev.innerHTML = `<div class="previa-tit">Vista previa</div>`;
@@ -180,6 +186,7 @@ const App = {
       prev.appendChild(ifr);
       box.appendChild(prev);
     }
+    if (bloqueado) return box;
     const bts = document.createElement('div');
     bts.className = 'cm-bts';
     const bCopiar = document.createElement('button');
@@ -188,15 +195,15 @@ const App = {
     bts.appendChild(bCopiar);
     const bDesc = document.createElement('button');
     bDesc.type = 'button';
-    if (art && art.tipo === 'html') {
+    if (art && art.tipo === 'html' && entrega !== 'texto') {
       bDesc.textContent = '⬇ Descargar .html';
-      bDesc.onclick = () => descargar(art.contenido, 'enjambre-5.html', 'text/html;charset=utf-8');
+      bDesc.onclick = () => descargar(art.contenido, 'enjambre-7.html', 'text/html;charset=utf-8');
     } else if (art && art.tipo === 'python') {
       bDesc.textContent = '⬇ Descargar .py';
-      bDesc.onclick = () => descargar(art.contenido, 'enjambre-5.py', 'text/x-python;charset=utf-8');
+      bDesc.onclick = () => descargar(art.contenido, 'enjambre-7.py', 'text/x-python;charset=utf-8');
     } else {
       bDesc.textContent = '⬇ Descargar .txt';
-      bDesc.onclick = () => descargar(art && art.contenido ? art.contenido : texto, 'enjambre-5.txt');
+      bDesc.onclick = () => descargar(art && art.contenido ? art.contenido : texto, 'enjambre-7.txt');
     }
     bts.appendChild(bDesc);
     box.appendChild(bts);
@@ -231,14 +238,13 @@ const App = {
 
   ideas() {
     const items = [
-      'App web móvil de inventario: alta, baja, búsqueda, total y exportar CSV, con localStorage. Un solo HTML, oscuro.',
-      'Script de Python que cuente palabras, líneas y las 10 palabras más usadas de un texto. Sin librerías externas.',
+      'Escribe un haiku en español sobre el café. Solo el haiku, nada más.',
+      'App web de una sola página: un botón grande que cuenta clics y muestra el número. Un solo HTML, autónomo, móvil, fondo oscuro.',
       'Plan de marketing de 7 días para una taquería en CDMX que vende por WhatsApp. Con mensajes listos.',
-      'Prompt de imagen en inglés, detallado, para el logo de una app llamada Enjambre 5: 5 nodos conectados, estilo tech.',
-      'Corrige este JS y déjalo funcionando:\nfunction suma(a b) {\n  retrun a + c;\n}\nconsole.log(suma(2,3));',
+      'Script de Python que cuente palabras, líneas y las 10 palabras más usadas de un texto. Sin librerías externas.',
     ];
     const c = $('#encIdeas');
-    c.innerHTML = items.map(t => `<button type="button"></button>`).join('');
+    c.innerHTML = items.map(() => `<button type="button"></button>`).join('');
     $$('button', c).forEach((b, i) => {
       b.textContent = items[i].split('\n')[0];
       b.onclick = () => { $('#cajaIn').value = items[i]; autoAlto($('#cajaIn')); this.enviar(); };
@@ -252,18 +258,32 @@ const App = {
     return false;
   },
 
+  textoAdjunto() {
+    if (!this.adjunto) return '';
+    const a = this.adjunto;
+    if (a.tipo === 'texto') return 'Archivo de texto adjunto (' + a.nombre + '):\n' + a.texto;
+    return 'Imagen adjunta: ' + a.nombre + (a.wh ? ' (' + a.wh + ')' : '') + '. No hay descripción automática (no se usa un modelo de visión en este enjambre). Si el encargo habla de la imagen, úsalo; si no, solo toma nota de que hay una imagen.';
+  },
+  limpiarAdjunto() {
+    this.adjunto = null;
+    const n = $('#adjuntoNom');
+    if (n) { n.hidden = true; n.textContent = ''; }
+    const inp = $('#inAdjunto');
+    if (inp) inp.value = '';
+  },
+
   async enviar(ev) {
     if (ev) ev.preventDefault();
     if (this.ocupado) { toast('Espera a que terminen'); return; }
     if (this.modo === 'ajustes') return;
     const ta = $('#cajaIn');
     const texto = ta.value.trim();
-    if (!texto) return;
+    if (!texto && !this.adjunto) return;
     if (!navigator.onLine) { toast('Sin internet, no puedo llamar a las IAs'); return; }
     if (!this.asegurarLlaves()) return;
     ta.value = ''; autoAlto(ta);
-    if (this.modo === 'grupo') await this.enviarGrupo(texto);
-    else await this.enviarEncargo(texto);
+    if (this.modo === 'grupo') await this.enviarGrupo(texto || '(adjunto)');
+    else await this.enviarEncargo(texto || 'Revisa el adjunto y entrega lo que corresponda.');
   },
 
   async enviarEncargo(texto, contexto) {
@@ -271,9 +291,13 @@ const App = {
     this.ctrl = new AbortController();
     $('#cajaEnviar').disabled = true;
     this.resetEstados();
+    const profundo = !!( $('#chkProfundo') && $('#chkProfundo').checked );
+    const adjunto = this.textoAdjunto();
+    this.limpiarAdjunto();
     const run = {
       id: uid(), when: Date.now(), orden: texto, contexto: contexto || '',
       pasos: [], resultado: '', artefacto: null, error: null, veredictos: [], rondas: 0, modelos: {},
+      entrega: '', score: null, bloqueado: false, profundo,
     };
     this.encargos.push(run);
     $('#encVacio').hidden = true;
@@ -288,6 +312,8 @@ const App = {
       const hist = await Swarm.correr(texto, {
         signal: this.ctrl.signal,
         contexto,
+        profundo,
+        adjunto,
         onPaso: (paso) => {
           const prev = mapa[paso.id];
           mapa[paso.id] = paso;
@@ -296,10 +322,6 @@ const App = {
             if (i >= 0) run.pasos[i] = paso;
           } else run.pasos.push(paso);
           this.actualizarPaso(run.id, paso);
-          ORDEN_ROLES.forEach(id => {
-            const activo = rolDe(paso.rol).id === id && paso.estado === 'run';
-            this.setEstadoRol(id, activo ? 'pensando' : (this.estadoRol[id] === 'pensando' && rolDe(paso.rol).id === id ? 'listo' : this.estadoRol[id]));
-          });
           if (paso.estado === 'run') this.setEstadoRol(paso.rol, 'pensando');
           else this.setEstadoRol(paso.rol, 'listo');
           this.alFinal();
@@ -308,12 +330,16 @@ const App = {
       Object.assign(run, {
         resultado: hist.resultado, artefacto: hist.artefacto, entrega: hist.entrega, error: hist.error,
         veredictos: hist.veredictos, rondas: hist.rondas, modelos: hist.modelos, pasos: hist.pasos, ms: hist.ms,
+        score: hist.score, bloqueado: hist.bloqueado, profundo: hist.profundo,
       });
       window.__e5ultimoEncargo = {
-        id: run.id, rondas: run.rondas, veredictos: (run.veredictos || []).map(v => v.veredicto),
-        fallos: run.veredictos, tipo: (run.artefacto || {}).tipo, entrega: run.entrega, error: run.error,
-        modelos: run.modelos, tieneResultado: !!run.resultado, ms: run.ms,
-        preview: String((run.artefacto && run.artefacto.contenido) || run.resultado || '').slice(0, 400),
+        id: run.id, rondas: run.rondas,
+        veredictos: (run.veredictos || []).map(v => v.pass ? 'PASS' : 'FAIL'),
+        scores: (run.veredictos || []).map(v => v.score),
+        fallos: run.veredictos, tipo: (run.artefacto || {}).tipo, entrega: run.entrega,
+        error: run.error, modelos: run.modelos, tieneResultado: !!run.resultado,
+        ms: run.ms, score: run.score, bloqueado: !!run.bloqueado,
+        preview: String((run.artefacto && run.artefacto.contenido) || run.resultado || run.error || '').slice(0, 400),
       };
     } catch (e) {
       run.error = e.message || String(e);
@@ -329,6 +355,7 @@ const App = {
     this.ctrl = null;
     $('#cajaEnviar').disabled = false;
     this.syncPromover();
+    Ajustes.pintarMetricas();
     this.alFinal();
   },
 
@@ -394,6 +421,7 @@ const App = {
     this.ctrl = null;
     $('#cajaEnviar').disabled = false;
     this.syncPromover();
+    Ajustes.pintarMetricas();
   },
 
   async promover() {
@@ -426,6 +454,27 @@ const App = {
 };
 
 const Ajustes = {
+  pintarMetricas() {
+    const tb = $('#ajMetricas');
+    if (!tb) return;
+    const filas = Metricas.filas();
+    tb.innerHTML = '<thead><tr><th>Agente</th><th>Llamadas</th><th>Errores</th><th>Latencia</th><th>Tokens</th><th>Análisis</th></tr></thead><tbody>' +
+      filas.map(f => `<tr><td>${escaparHTML((ROLES[f.id] || {}).nombre || f.id)}</td><td>${f.llamadas}</td><td>${f.errores}</td><td>${f.latencia ? f.latencia + ' ms' : '—'}</td><td>${f.tokens || '—'}</td><td>${f.iteraciones || '—'}</td></tr>`).join('') +
+      '</tbody>';
+  },
+  pintarFallos() {
+    const panel = $('#panelFallos');
+    const lista = $('#fallosLista');
+    const n = $('#fallosN');
+    if (!panel) return;
+    const items = FallosLog.items || [];
+    n.textContent = items.length;
+    panel.hidden = items.length === 0;
+    lista.innerHTML = items.slice().reverse().map(it => {
+      const nom = it.rol ? (rolDe(it.rol).nombre || it.rol) : 'Sistema';
+      return `<div class="fallo-item"><b>${escaparHTML(nom)}</b> · ${escaparHTML(it.tipo)} · ${escaparHTML(ahoraCorto(it.when))}<br>${escaparHTML(it.detalle)}${it.accion ? '<br><span class="muted">' + escaparHTML(it.accion) + '</span>' : ''}</div>`;
+    }).join('');
+  },
   pintar() {
     const caja = $('#ajPinCaja');
     caja.innerHTML = '';
@@ -458,8 +507,10 @@ const Ajustes = {
     ul.innerHTML = ORDEN_ROLES.map(id => {
       const r = ROLES[id];
       const mod = AI.modeloDe[id] || r.modeloPref;
-      return `<li>${avHTML(id)}<div><b>${escaparHTML(r.nombre)}</b> · ${escaparHTML(r.corto)}<br><span class="muted">${escaparHTML(mod)}</span></div></li>`;
+      const nom = r.nombreLargo || r.nombre;
+      return `<li>${avHTML(id)}<div><b>${escaparHTML(nom)}</b> · ${escaparHTML(r.corto)}<br><span class="muted">${escaparHTML(mod)}</span></div></li>`;
     }).join('');
+    this.pintarMetricas();
   },
 };
 
@@ -472,11 +523,13 @@ function syncCompacto() {
 }
 
 window.addEventListener('DOMContentLoaded', async () => {
+  Metricas.reset();
   App.cargar();
   App.ideas();
   App.pintarEquipo();
   App.pintarEncargos();
   App.pintarGrupo();
+  Ajustes.pintarFallos();
   $$('.modos button').forEach(b => b.onclick = () => App.ir(b.dataset.modo));
   $('#btnAjustes').onclick = () => App.ir(App.modo === 'ajustes' ? (localStorage.getItem('e5_modo') || 'encargo') : 'ajustes');
   $('#ajVolver').onclick = () => App.ir(localStorage.getItem('e5_modo') || 'encargo');
@@ -488,12 +541,52 @@ window.addEventListener('DOMContentLoaded', async () => {
   ta.addEventListener('keydown', e => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); App.enviar(); }
   });
+  const chk = $('#chkProfundo');
+  if (chk) {
+    chk.checked = localStorage.getItem('e5_profundo') === '1';
+    chk.onchange = () => localStorage.setItem('e5_profundo', chk.checked ? '1' : '0');
+  }
+  $('#btnAdjunto').onclick = () => $('#inAdjunto').click();
+  $('#inAdjunto').onchange = async ev => {
+    const f = ev.target.files && ev.target.files[0];
+    if (!f) return;
+    if (f.type.startsWith('image/')) {
+      const url = URL.createObjectURL(f);
+      const img = new Image();
+      img.onload = () => {
+        App.adjunto = { tipo: 'imagen', nombre: f.name, wh: img.naturalWidth + '×' + img.naturalHeight };
+        URL.revokeObjectURL(url);
+        const n = $('#adjuntoNom');
+        n.hidden = false;
+        n.textContent = '📎 ' + f.name + ' (' + App.adjunto.wh + ') — se envía como descripción, no hay visión automática.';
+      };
+      img.src = url;
+    } else {
+      const txt = (await f.text()).slice(0, 8000);
+      App.adjunto = { tipo: 'texto', nombre: f.name, texto: txt };
+      const n = $('#adjuntoNom');
+      n.hidden = false;
+      n.textContent = '📎 ' + f.name + ' (' + txt.length + ' caracteres)';
+    }
+  };
+  $('#btnFallosCab').onclick = () => {
+    const l = $('#fallosLista');
+    const open = l.hidden;
+    l.hidden = !open;
+    $('#btnFallosCab').setAttribute('aria-expanded', open ? 'true' : 'false');
+  };
+  document.addEventListener('e5-fallos', () => Ajustes.pintarFallos());
+  $('#ajCsv').onclick = () => descargar(Metricas.csv(), 'enjambre-7-metricas.csv', 'text/csv;charset=utf-8');
   $('#ajBorrar').onclick = () => {
     if (!confirm('¿Borrar encargos y el chat del grupo de este teléfono?')) return;
     App.encargos = []; App.grupo = [];
     localStorage.removeItem('e5_encargos');
     localStorage.removeItem('e5_grupo');
+    FallosLog.reset();
+    Metricas.reset();
     App.pintarEncargos(); App.pintarGrupo();
+    Ajustes.pintar();
+    Ajustes.pintarFallos();
     toast('Historial borrado');
   };
   $('#ajProbar').onclick = async () => {
@@ -520,5 +613,5 @@ window.addEventListener('DOMContentLoaded', async () => {
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === '127.0.0.1' || location.hostname === 'localhost')) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
-  window.__e5 = { App, AI, ROLES, ORDEN_ROLES, Swarm, Grupo, Llaves };
+  window.__e5 = { App, AI, ROLES, ORDEN_ROLES, Swarm, Grupo, Llaves, Metricas, FallosLog };
 });

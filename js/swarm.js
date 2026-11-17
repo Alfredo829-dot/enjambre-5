@@ -1,54 +1,76 @@
 const SYS = {
-  estratega: `Eres el Estratega del Enjambre 5. Antes de planear, entiendes bien lo que quiere Alfredo, eliges el camino más rápido y barato, y dejas un plan concreto para el Ejecutor.
-
-Modo Encargo (este es tu modo ahora): no haces preguntas. Si falta algo esencial, asumes defaults sensatos y los declaras en "supuestos". No pides permiso ni confirmación.
-
-El campo "entrega" es obligatorio y debe coincidir con lo que se va a entregar de verdad:
-- "texto": haiku, poema, copy, lista, plan, prompt, carta, nombres, mensajes. El resultado es texto plano (markdown permitido). NUNCA una página ni una app.
+  percepcion: `Eres Percepción del Enjambre 7. Entiendes y normalizas el encargo de Alfredo, incluyendo texto o la descripción de una imagen adjunta si la hay.
+Extraes la intención y el tipo de entrega. No pides permiso. No evades las salvaguardas del modelo.
+El campo "entrega" debe coincidir con lo que se va a entregar de verdad:
+- "texto": haiku, poema, copy, lista, plan, prompt, carta, nombres, mensajes. Texto plano (markdown permitido). NUNCA una página ni una app.
 - "html": solo si pide una app web, una página o un HTML.
 - "python": solo si pide un script de Python.
-
-No usas relleno ni saludos. No evades las salvaguardas del modelo.
 Respondes SOLO con JSON válido:
-{"objetivo":"...","supuestos":["..."],"camino":"por qué este es el camino más rápido y barato","tipo":"web|codigo|plan|prompt|otro","entrega":"html|python|texto","pasos":["..."],"criterios":["..."],"notas":"..."}
-Textos en español mexicano. Sé concreto y breve.`,
+{"intencion":"...","resumen":"...","entrega":"html|python|texto","tipo":"web|codigo|plan|prompt|otro","adjuntos":"...","notas":"..."}
+Español mexicano. Sé concreto y breve.`,
 
-  ejecutor: `Eres el Ejecutor del Enjambre 5. Tomas el plan y produces el entregable completo, listo para usar, en el FORMATO OBLIGATORIO que se te indica.
-Sin relleno, sin pedir permiso, sin disculpas. No evades las salvaguardas del modelo.
-Reglas de formato (obedécelas al pie de la letra):
-- Si la entrega es html: un HTML completo, autónomo, móvil, en un bloque \`\`\`html. Sin librerías de pago. CSS incluido.
-- Si la entrega es python: un script completo en \`\`\`python, sin dependencias externas salvo la biblioteca estándar.
-- Si la entrega es texto: SOLO el texto pedido (markdown permitido). NUNCA lo envuelvas en HTML, CSS, <!doctype> ni en una app o página. No inventes una interfaz para "presentarlo".
-UI y copy en español mexicano cuando el producto sea para Alfredo o sus clientes.`,
+  razonamiento: `Eres Razonamiento del Enjambre 7 (el puesto que antes era el Estratega). Armas un plan técnico ejecutable, eliges el camino más rápido y barato, y declaras una confianza de 0 a 1.
+Modo Encargo: no haces preguntas. Si falta algo, asumes defaults sensatos y los declaras en "supuestos".
+"entrega" debe respetar lo que detectó Percepción, salvo que el pedido original lo contradiga con claridad. En un haiku en español, 5-7-5 es una guía, no un criterio rígido. No evades las salvaguardas.
+Respondes SOLO con JSON válido:
+{"objetivo":"...","supuestos":["..."],"camino":"...","tipo":"web|codigo|plan|prompt|otro","entrega":"html|python|texto","pasos":["..."],"criterios":["..."],"confianza":0.0,"notas":"..."}
+confianza es un número entre 0 y 1. Español mexicano. Sé concreto y breve.`,
 
-  critico: `Eres el Analista Crítico del Enjambre 5. Tu única métrica es encontrar fallos respecto al objetivo y al FORMATO exigido. No suavices. No elogies.
-No evades las salvaguardas del modelo. Respondes SOLO con JSON válido:
-{"veredicto":"PASS" o "FAIL","fallos":["descripción exacta y accionable"],"orden":"rehecho inmediato: ... o ok"}
-Reglas de veredicto:
-- FAIL si el formato no coincide (ejemplo: entregaron HTML o una app cuando se pedía texto; o texto cuando se pedía HTML).
-- FAIL si hay errores, está incompleto, no cumple los criterios o es mediocre a nivel estructural PARA ESE FORMATO.
-- Si el formato es texto, un haiku, plan, copy o lista que cumple el pedido es PASS. No pidas interfaz, CSS, botones, localStorage ni "usabilidad de app".
-- Si el formato es html, ahí sí juzga que sea una página/app usable y completa.
-PASS solo si cumple el objetivo Y el formato. Máximo 6 fallos. Español mexicano en las descripciones.`,
+  supervision: `Eres Supervisión del Enjambre 7. Validas el plan antes de ejecutarlo.
+Apruebas solo si: hay al menos un paso concreto, la confianza es >= 0.5, el formato de entrega es coherente, y no hay un pedido de evadir salvaguardas o de hacer daño.
+Si algo no se sostiene, bloqueas con razones accionables. No suavices.
+Respondes SOLO con JSON válido:
+{"aprobado":true o false,"pasos_ok":true o false,"confianza_ok":true o false,"seguridad_ok":true o false,"razones":["..."]}
+Español mexicano.`,
 
-  expansor: `Eres el Expansor del Enjambre 5. Tomas el entregable que ya pasó control de calidad y le añades pulido y 1 a 3 extras útiles que no rompan el objetivo NI el FORMATO OBLIGATORIO.
-- Si es HTML: mejora la experiencia móvil y entrega el HTML completo en \`\`\`html.
-- Si es Python: mejoras concretas con el archivo completo en \`\`\`python.
-- Si es texto: pule el wording o añade un extra breve en el mismo texto. Sigue siendo texto plano o markdown. NUNCA lo conviertas en una página, app, HTML o CSS. NUNCA lo envuelvas en <!doctype> ni en una interfaz para "presentarlo".
-Sin relleno. No evades las salvaguardas. Español mexicano en la UI/copy.`,
+  accion: `Eres Acción del Enjambre 7. Tomas el plan aprobado y produces el entregable completo, listo para usar, en el FORMATO OBLIGATORIO.
+Sin relleno, sin pedir permiso. No evades las salvaguardas del modelo.
+- html: un HTML completo, autónomo, móvil, en un bloque \`\`\`html. CSS incluido. Sin librerías de pago.
+- python: un script completo en \`\`\`python, solo biblioteca estándar.
+- texto: SOLO el texto pedido (markdown permitido). NUNCA lo envuelvas en HTML, CSS, <!doctype> ni en una app.
+Español mexicano en la UI/copy cuando aplique.`,
 
-  controlador: `Eres el Controlador del Enjambre 5. Conservas el objetivo original de Alfredo y el FORMATO OBLIGATORIO.
-Entregas SOLO el resultado final, conciso y listo para usar. Cero relato de cómo discutieron los agentes. Cero relleno.
-- Si el formato es html: el documento completo en \`\`\`html. Encima, 2 o 3 líneas de resumen como máximo.
-- Si el formato es python: el script completo en \`\`\`python, con un resumen breve si hace falta.
-- Si el formato es texto: entrega SOLO el texto final (markdown permitido). NUNCA lo envuelvas en HTML, CSS, una app o una página de presentación. No agregues un marco visual.
-Español mexicano. No evades las salvaguardas del modelo.`,
+  feedback: `Eres Feedback del Enjambre 7. Puntúas el entregable de 0 a 1 contra el objetivo y el FORMATO exigido.
+No suavices. No evades las salvaguardas. Respondes SOLO con JSON válido:
+{"score":0.0,"fallos":["..."],"orden":"rehecho: ... o ok"}
+Reglas:
+- score < 0.8 si el formato no coincide (HTML cuando se pedía texto, o al revés), si está incompleto, con errores, o no cumple los criterios PARA ESE FORMATO.
+- Si el formato es texto, un haiku, plan, copy o lista que cumple el pedido debe poder tener score >= 0.8. No pidas interfaz, CSS ni funciones de app.
+- Un haiku en español de tres versos sobre el tema cumple aunque el conteo 5-7-5 sea aproximado. No bajes de 0.8 solo por sílabas de más o de menos si hay tres líneas, trata el tema y está en texto plano.
+- Reserva scores < 0.8 para incumplimiento del pedido, formato equivocado (texto vs html) o errores graves.
+- Si el formato es html, juzga que sea una página/app usable y completa.
+Máximo 6 fallos. Español mexicano. score es un número entre 0 y 1.`,
+
+  adaptacion: `Eres Adaptación del Enjambre 7. Tomas el mejor entregable disponible y lo dejas listo para Alfredo, respetando el FORMATO OBLIGATORIO.
+- Si el score fue >= 0.8: pule un poco y, si aporta, 1 a 3 extras que no rompan el objetivo ni el formato.
+- Si el score fue < 0.8: hay desvío. Corrige los fallos, alinea el resultado con el pedido original y entrega la versión completa.
+- html: SOLO un bloque \`\`\`html con el documento completo. python: SOLO un bloque \`\`\`python. texto: SOLO el texto pedido.
+Responde únicamente con el entregable. Sin saludo, sin "aquí tienes", sin explicar el score, sin preámbulo ni epílogo.
+No evades las salvaguardas. Español mexicano en la UI/copy cuando aplique.`,
 };
 
+
+function suavizarPuntaje(score, fallos, entrega, orden, trabajo) {
+  if (entrega !== 'texto') return { score, fallos, suavizado: false };
+  if (!/\bhaiku\b/i.test(orden)) return { score, fallos, suavizado: false };
+  const lineas = String(trabajo || '').trim().split(/\n/).map(l => l.trim()).filter(Boolean);
+  if (lineas.length < 2 || lineas.length > 6) return { score, fallos, suavizado: false };
+  const reSil = /s[ií]laba|5\s*[-–]\s*7\s*[-–]\s*5|verso tiene|l[ií]nea tiene|mora|m[eé]trica/i;
+  const lista = (fallos || []).map(String);
+  const soloMetrica = lista.length === 0 || lista.every(f => reSil.test(f));
+  if (score < 0.8 && soloMetrica) {
+    return { score: Math.max(score, 0.85), fallos: [], suavizado: true };
+  }
+  return { score, fallos, suavizado: false };
+}
+
 const Swarm = {
-  async correr(orden, { onPaso, signal, contexto } = {}) {
+  async correr(orden, { onPaso, signal, contexto, profundo, adjunto } = {}) {
     const t0 = Date.now();
-    const historial = { orden, veredictos: [], rondas: 0, pasos: [], resultado: '', artefacto: null, error: null, modelos: {}, entrega: 'texto' };
+    const historial = {
+      orden, veredictos: [], rondas: 0, pasos: [], resultado: '', artefacto: null,
+      error: null, modelos: {}, entrega: 'texto', score: null, bloqueado: false, profundo: !!profundo,
+    };
     const emitir = (paso) => {
       const i = historial.pasos.findIndex(x => x.id === paso.id);
       if (i >= 0) historial.pasos[i] = paso;
@@ -63,174 +85,252 @@ const Swarm = {
         maxTokens: extra.maxTokens ?? 1400,
         temp: extra.temp ?? 0.3,
         signal,
+        timeout: extra.timeout,
       });
       historial.modelos[rol] = out.modelo + (out.via === 'pollinations' ? ' (respaldo)' : '');
       return out;
     };
 
-    const ctx = contexto ? `\n\nContexto del grupo:\n${contexto}` : '';
+    const ctx = contexto ? '\n\nContexto del grupo:\n' + contexto : '';
+    const adj = adjunto ? '\n\nADJUNTOS:\n' + adjunto : '';
 
-    // 1. Estratega
-    emitir({ id: 'est', rol: 'estratega', estado: 'run', titulo: 'Estratega · entendiendo y planeando', detalle: '' });
-    let planTxt, plan, entrega;
+    // 1. Percepción
+    emitir({ id: 'per', rol: 'percepcion', estado: 'run', titulo: 'Percepción · entendiendo el pedido', detalle: '' });
+    let perc = { intencion: orden, resumen: orden, entrega: 'texto', tipo: 'otro', adjuntos: '', notas: '' };
     try {
-      const out = await pedir('estratega', [
-        { role: 'system', content: SYS.estratega },
-        { role: 'user', content: 'ENCARGO:\n' + orden + ctx },
+      const out = await pedir('percepcion', [
+        { role: 'system', content: SYS.percepcion },
+        { role: 'user', content: 'ENCARGO:\n' + orden + ctx + adj },
+      ], { maxTokens: 700, temp: 0.15 });
+      perc = extraerJSON(out.texto) || perc;
+      perc.entrega = entregaDe(perc, orden);
+      historial.entrega = perc.entrega;
+      emitir({ id: 'per', rol: 'percepcion', estado: 'ok', titulo: 'Percepción · pedido claro', detalle: out.texto, resumen: resumir((perc.intencion || perc.resumen || '') + ' · ' + perc.entrega, 120) });
+    } catch (e) {
+      FallosLog.registrar({ rol: 'percepcion', tipo: 'error', detalle: e.message, accion: 'se asume el encargo original como texto normalizado' });
+      emitir({ id: 'per', rol: 'percepcion', estado: 'ok', titulo: 'Percepción · se asume el pedido', detalle: e.message, resumen: 'Sigue con el texto original' });
+    }
+
+    // 2. Razonamiento
+    emitir({ id: 'raz', rol: 'razonamiento', estado: 'run', titulo: 'Razonamiento · planeando', detalle: '' });
+    let planTxt = '', plan;
+    try {
+      const out = await pedir('razonamiento', [
+        { role: 'system', content: SYS.razonamiento },
+        { role: 'user', content: 'ENCARGO:\n' + orden + ctx + adj + '\n\nPERCEPCIÓN:\n' + JSON.stringify(perc) },
       ], { maxTokens: 900, temp: 0.2 });
       planTxt = out.texto;
-      plan = extraerJSON(planTxt) || { objetivo: orden, tipo: 'otro', entrega: 'texto', pasos: [], criterios: [], supuestos: [], camino: '', notas: planTxt };
-      entrega = entregaDe(plan, orden);
-      plan.entrega = entrega;
-      historial.entrega = entrega;
-      const resumenEst = resumir((plan.camino ? plan.camino + ' · ' : '') + (plan.objetivo || planTxt), 120);
-      emitir({ id: 'est', rol: 'estratega', estado: 'ok', titulo: 'Estratega · plan listo', detalle: planTxt, resumen: resumenEst });
+      plan = extraerJSON(planTxt) || { objetivo: orden, tipo: perc.tipo || 'otro', entrega: perc.entrega, pasos: [], criterios: [], supuestos: [], camino: '', confianza: 0.6, notas: planTxt };
     } catch (e) {
-      emitir({ id: 'est', rol: 'estratega', estado: 'fail', titulo: 'Estratega · no pudo planear', detalle: e.message, resumen: e.message });
+      emitir({ id: 'raz', rol: 'razonamiento', estado: 'fail', titulo: 'Razonamiento · no pudo planear', detalle: e.message, resumen: e.message });
       historial.error = e.message;
       return historial;
     }
 
-    const formato = reglasEntrega(entrega);
-    const planCompacto = JSON.stringify({
-      objetivo: plan.objetivo,
-      supuestos: plan.supuestos,
-      camino: plan.camino,
-      tipo: plan.tipo,
-      entrega,
-      pasos: plan.pasos,
-      criterios: plan.criterios,
-      notas: plan.notas,
+    if (profundo) {
+      try {
+        Metricas.iterar('razonamiento', 1);
+        const ref = await pedir('razonamiento', [
+          { role: 'system', content: SYS.razonamiento + '\nEstás en una pasada extra de análisis profundo: mejora el plan, no lo alargues de más, ajusta la confianza con honestidad.' },
+          { role: 'user', content: 'ENCARGO:\n' + orden + '\n\nPLAN A REFINAR:\n' + planTxt },
+        ], { maxTokens: 900, temp: 0.2 });
+        const p2 = extraerJSON(ref.texto);
+        if (p2 && Array.isArray(p2.pasos) && p2.pasos.length) {
+          plan = p2;
+          planTxt = ref.texto;
+        }
+      } catch (e) {
+        FallosLog.registrar({ rol: 'razonamiento', tipo: 'error', detalle: 'Refinamiento profundo: ' + e.message, accion: 'se conserva el primer plan' });
+      }
+    }
+
+    const entrega = entregaDe({ ...plan, entrega: plan.entrega || perc.entrega }, orden);
+    plan.entrega = entrega;
+    historial.entrega = entrega;
+    const confianza = Number(plan.confianza);
+    plan.confianza = Number.isFinite(confianza) ? Math.max(0, Math.min(1, confianza)) : 0;
+    emitir({
+      id: 'raz', rol: 'razonamiento', estado: 'ok', titulo: 'Razonamiento · plan listo',
+      detalle: planTxt, resumen: resumir('confianza ' + plan.confianza + ' · ' + (plan.objetivo || ''), 120),
     });
 
-    const aplicarFormato = (txt) => (entrega === 'texto' ? forzarTextoPlano(txt) : txt);
+    const formato = reglasEntrega(entrega);
+    const planCompacto = JSON.stringify({
+      objetivo: plan.objetivo, supuestos: plan.supuestos, camino: plan.camino,
+      tipo: plan.tipo, entrega, pasos: plan.pasos, criterios: plan.criterios,
+      confianza: plan.confianza, notas: plan.notas,
+    });
 
-    // 2-3. Ejecutor + Crítico, hasta 3 rondas
+    // 3. Supervisión
+    emitir({ id: 'sup', rol: 'supervision', estado: 'run', titulo: 'Supervisión · validando el plan', detalle: '' });
+    let superv = { aprobado: true, pasos_ok: true, confianza_ok: true, seguridad_ok: true, razones: [] };
+    try {
+      const out = await pedir('supervision', [
+        { role: 'system', content: SYS.supervision },
+        { role: 'user', content: 'ENCARGO:\n' + orden + '\n\nPLAN:\n' + planCompacto },
+      ], { maxTokens: 600, temp: 0.1 });
+      superv = extraerJSON(out.texto) || superv;
+      emitir({ id: 'sup', rol: 'supervision', estado: 'ok', titulo: 'Supervisión · revisión lista', detalle: out.texto, resumen: superv.aprobado === false ? 'observa problemas' : 'revisado' });
+    } catch (e) {
+      FallosLog.registrar({ rol: 'supervision', tipo: 'error', detalle: e.message, accion: 'se valida solo con reglas locales' });
+      emitir({ id: 'sup', rol: 'supervision', estado: 'ok', titulo: 'Supervisión · validación local', detalle: e.message, resumen: 'Sin respuesta del modelo; se usan reglas locales' });
+    }
+
+    const razones = [];
+    const pasosOk = Array.isArray(plan.pasos) && plan.pasos.filter(Boolean).length >= 1;
+    if (!pasosOk) razones.push('El plan no tiene pasos concretos.');
+    if (!(plan.confianza >= 0.5)) razones.push('La confianza del plan es menor a 0.5 (' + plan.confianza + ').');
+    if (superv && superv.aprobado === false) {
+      (superv.razones || ['Supervisión no aprobó el plan']).forEach(r => { if (r && !razones.includes(r)) razones.push(r); });
+    }
+    if (superv && superv.seguridad_ok === false) {
+      (superv.razones || ['El plan no pasa el filtro de seguridad']).forEach(r => { if (r && !razones.includes(r)) razones.push(r); });
+    }
+    if (typeof window !== 'undefined' && window.__e5forzar && window.__e5forzar.bloquearSupervision) {
+      razones.push('Bloqueo forzado de prueba.');
+    }
+    const bloqueado = razones.length > 0;
+    if (bloqueado) {
+      historial.bloqueado = true;
+      historial.error = 'Supervisión bloqueó el plan: ' + razones.join(' ');
+      FallosLog.registrar({ rol: 'supervision', tipo: 'bloqueo', detalle: razones.join(' | '), accion: 'no se ejecuta Acción' });
+      emitir({
+        id: 'sup', rol: 'supervision', estado: 'fail',
+        titulo: 'Supervisión · plan bloqueado',
+        detalle: razones.map((r, i) => (i + 1) + '. ' + r).join('\n'),
+        resumen: resumir(razones[0], 120),
+      });
+      historial.ms = Date.now() - t0;
+      return historial;
+    }
+    emitir({ id: 'sup', rol: 'supervision', estado: 'ok', titulo: 'Supervisión · plan aprobado', detalle: JSON.stringify(superv), resumen: 'confianza ' + plan.confianza });
+
+    const aplicarFormato = (txt) => {
+      if (entrega === 'texto') return forzarTextoPlano(txt);
+      if (entrega === 'html') return pareceHTML(txt) || String(txt || '').trim();
+      if (entrega === 'python') return extraerBloque(txt, ['python', 'py']) || String(txt || '').trim();
+      return String(txt || '').trim();
+    };
+
+    // 4-5. Acción + Feedback, hasta 3 rondas (umbral 0.8)
     let trabajo = '';
     let fallosPendientes = '';
-    let veredicto = 'FAIL';
+    let score = 0;
+    const umbral = 0.8;
     const maxRondas = 3;
     for (let r = 1; r <= maxRondas; r++) {
       historial.rondas = r;
-      const eid = 'eje' + r;
+      const eid = 'acc' + r;
       emitir({
-        id: eid,
-        rol: 'ejecutor',
-        estado: 'run',
-        titulo: r === 1 ? 'Ejecutor · produciendo' : 'Ejecutor · rehecho ronda ' + r,
+        id: eid, rol: 'accion', estado: 'run', ronda: r,
+        titulo: r === 1 ? 'Acción · produciendo' : 'Acción · corrección ronda ' + r,
         detalle: '',
-        ronda: r,
       });
       try {
         const msgs = [
-          { role: 'system', content: SYS.ejecutor + '\n' + formato },
-          { role: 'user', content: 'OBJETIVO ORIGINAL:\n' + orden + ctx + '\n\nPLAN DEL ESTRATEGA:\n' + planCompacto + '\n\n' + formato },
+          { role: 'system', content: SYS.accion + '\n' + formato },
+          { role: 'user', content: 'OBJETIVO ORIGINAL:\n' + orden + ctx + adj + '\n\nPLAN APROBADO:\n' + planCompacto + '\n\n' + formato },
         ];
         if (r > 1) {
           msgs.push({
             role: 'user',
-            content: 'REHECHO INMEDIATO. Corrige exactamente estos fallos y entrega la versión completa, no un parche suelto. Respeta el formato obligatorio (' + entrega + '):\n' + fallosPendientes,
+            content: 'CORRECCIÓN. El score fue ' + score + ' (hace falta >= 0.8). Corrige exactamente estos fallos y entrega la versión completa, en formato ' + entrega + ':\n' + fallosPendientes,
           });
         }
-        const out = await pedir('ejecutor', msgs, { maxTokens: 3500, temp: 0.3 });
+        const out = await pedir('accion', msgs, { maxTokens: 3500, temp: 0.3 });
         trabajo = aplicarFormato(out.texto);
+        if (profundo && r === 1) {
+          try {
+            Metricas.iterar('accion', 1);
+            const ref = await pedir('accion', [
+              { role: 'system', content: SYS.accion + '\n' + formato + '\nPasada extra de análisis profundo: revisa tu entregable y mejora lo que falle, sin cambiar el formato.' },
+              { role: 'user', content: 'OBJETIVO:\n' + orden + '\n\nTU ENTREGABLE:\n' + trabajo },
+            ], { maxTokens: 3500, temp: 0.25 });
+            trabajo = aplicarFormato(ref.texto || trabajo);
+          } catch (e) {
+            FallosLog.registrar({ rol: 'accion', tipo: 'error', detalle: 'Refinamiento: ' + e.message, accion: 'se conserva la primera versión' });
+          }
+        }
         emitir({
-          id: eid,
-          rol: 'ejecutor',
-          estado: 'ok',
-          titulo: r === 1 ? 'Ejecutor · entregable listo' : 'Ejecutor · ronda ' + r + ' lista',
-          detalle: trabajo,
-          resumen: resumir(trabajo, 120),
-          ronda: r,
+          id: eid, rol: 'accion', estado: 'ok', ronda: r,
+          titulo: r === 1 ? 'Acción · entregable listo' : 'Acción · ronda ' + r + ' lista',
+          detalle: trabajo, resumen: resumir(trabajo, 120),
         });
       } catch (e) {
-        emitir({ id: eid, rol: 'ejecutor', estado: 'fail', titulo: 'Ejecutor · falló', detalle: e.message, resumen: e.message, ronda: r });
+        emitir({ id: eid, rol: 'accion', estado: 'fail', titulo: 'Acción · falló', detalle: e.message, resumen: e.message, ronda: r });
         historial.error = e.message;
         break;
       }
 
-      const cid = 'cri' + r;
-      emitir({ id: cid, rol: 'critico', estado: 'run', titulo: 'Crítico · revisando ronda ' + r, detalle: '', ronda: r });
+      const fid = 'fb' + r;
+      emitir({ id: fid, rol: 'feedback', estado: 'run', titulo: 'Feedback · puntuando ronda ' + r, detalle: '', ronda: r });
       try {
-        const out = await pedir('critico', [
-          { role: 'system', content: SYS.critico + '\n' + formato },
+        const out = await pedir('feedback', [
+          { role: 'system', content: SYS.feedback + '\n' + formato },
           { role: 'user', content: 'OBJETIVO:\n' + orden + '\n\nFORMATO EXIGIDO: ' + entrega + '\n' + formato + '\n\nCRITERIOS:\n' + JSON.stringify(plan.criterios || []) + '\n\nENTREGABLE:\n' + trabajo },
         ], { maxTokens: 800, temp: 0.15 });
         const j = extraerJSON(out.texto) || {};
-        const v = String(j.veredicto || '').toUpperCase() === 'PASS' ? 'PASS' : 'FAIL';
-        veredicto = v;
-        historial.veredictos.push({ ronda: r, veredicto: v, fallos: j.fallos || [], raw: out.texto });
-        const fallos = (j.fallos || []).filter(Boolean);
-        fallosPendientes = fallos.map((f, i) => (i + 1) + '. ' + f).join('\n') || out.texto;
+        let s = Number(j.score);
+        if (!Number.isFinite(s)) s = String(j.veredicto || '').toUpperCase() === 'PASS' ? 0.85 : 0.4;
+        s = Math.max(0, Math.min(1, s));
+        let fallos = (j.fallos || []).filter(Boolean);
+        const suave = suavizarPuntaje(s, fallos, entrega, orden, trabajo);
+        if (suave.suavizado) {
+          s = suave.score;
+          fallos = suave.fallos;
+        }
+        score = s;
+        historial.score = s;
+        fallosPendientes = fallos.map((f, i) => (i + 1) + '. ' + f).join('\n') || (suave.suavizado ? '' : out.texto);
+        historial.veredictos.push({ ronda: r, score: s, pass: s >= umbral, fallos, raw: out.texto, suavizado: !!suave.suavizado });
         emitir({
-          id: cid,
-          rol: 'critico',
-          estado: v === 'PASS' ? 'ok' : 'fail',
-          titulo: v === 'PASS' ? 'Crítico · PASS' : 'Crítico · FAIL · ronda ' + r,
+          id: fid, rol: 'feedback', estado: s >= umbral ? 'ok' : 'fail', ronda: r, veredicto: s >= umbral ? 'PASS' : 'FAIL',
+          titulo: s >= umbral ? ('Feedback · ' + s.toFixed(2) + ' PASS') : ('Feedback · ' + s.toFixed(2) + ' · ronda ' + r),
           detalle: out.texto,
-          resumen: v === 'PASS' ? 'Sin fallos bloqueantes' : resumir((fallos[0] || 'Hay que rehacer'), 120),
-          ronda: r,
-          veredicto: v,
+          resumen: s >= umbral ? 'Cumple el pedido y el formato' : resumir((fallos[0] || 'Hay que corregir'), 120),
         });
-        if (v === 'PASS') break;
+        if (s >= umbral) break;
       } catch (e) {
-        // Si el crítico no responde, no bloqueamos el flujo: seguimos con lo que hay.
-        veredicto = 'PASS';
-        historial.veredictos.push({ ronda: r, veredicto: 'PASS', fallos: [], raw: 'crítico no disponible: ' + e.message, omitido: true });
+        score = 0.8;
+        historial.score = score;
+        historial.veredictos.push({ ronda: r, score, pass: true, fallos: [], raw: 'feedback no disponible: ' + e.message, omitido: true });
+        FallosLog.registrar({ rol: 'feedback', tipo: 'error', detalle: e.message, accion: 'se continúa con el entregable actual' });
         emitir({
-          id: cid,
-          rol: 'critico',
-          estado: 'ok',
-          titulo: 'Crítico · no respondió; seguimos',
-          detalle: e.message,
-          resumen: 'Se continúa con el entregable actual',
-          ronda: r,
+          id: fid, rol: 'feedback', estado: 'ok', titulo: 'Feedback · no respondió; seguimos', detalle: e.message,
+          resumen: 'Se continúa con el entregable actual', ronda: r,
         });
         break;
       }
     }
 
     if (!trabajo) {
-      historial.error = historial.error || 'El Ejecutor no produjo un entregable';
+      historial.error = historial.error || 'Acción no produjo un entregable';
+      historial.ms = Date.now() - t0;
       return historial;
     }
-    const trabajoTxt = typeof trabajo === 'string' ? trabajo : String(trabajo);
 
-    // 4. Expansor
-    emitir({ id: 'exp', rol: 'expansor', estado: 'run', titulo: 'Expansor · puliendo', detalle: '' });
-    let pulido = trabajoTxt;
+    // 6. Adaptación (empaqueta el resultado final)
+    emitir({ id: 'ada', rol: 'adaptacion', estado: 'run', titulo: score < umbral ? 'Adaptación · corrigiendo desvío' : 'Adaptación · puliendo', detalle: '' });
+    let finalTxt = trabajo;
     try {
-      const out = await pedir('expansor', [
-        { role: 'system', content: SYS.expansor + '\n' + formato },
-        { role: 'user', content: 'OBJETIVO:\n' + orden + '\n\nFORMATO EXIGIDO: ' + entrega + '\n' + formato + '\n\nENTREGABLE APROBADO (o última versión):\n' + trabajoTxt },
-      ], { maxTokens: 3500, temp: 0.55 });
-      pulido = aplicarFormato(out.texto || trabajoTxt);
-      emitir({ id: 'exp', rol: 'expansor', estado: 'ok', titulo: 'Expansor · versión pulida', detalle: pulido, resumen: resumir(pulido, 120) });
+      const extra = score < umbral
+        ? '\nHay DESVÍO (score ' + score + ' < 0.8). Corrige los fallos y alinea el resultado con el pedido, sin cambiar el formato.\nFALLOS:\n' + fallosPendientes
+        : '\nEl score fue ' + score + '. Pule sin desviarte.';
+      const out = await pedir('adaptacion', [
+        { role: 'system', content: SYS.adaptacion + '\n' + formato },
+        { role: 'user', content: 'OBJETIVO:\n' + orden + ctx + '\n\nFORMATO EXIGIDO: ' + entrega + '\n' + formato + '\n\nENTREGABLE:\n' + trabajo + extra },
+      ], { maxTokens: 3500, temp: score < umbral ? 0.3 : 0.55 });
+      finalTxt = aplicarFormato(out.texto || trabajo);
+      emitir({ id: 'ada', rol: 'adaptacion', estado: 'ok', titulo: 'Adaptación · resultado listo', detalle: finalTxt, resumen: resumir(finalTxt, 120) });
     } catch (e) {
-      emitir({ id: 'exp', rol: 'expansor', estado: 'ok', titulo: 'Expansor · se omite', detalle: e.message, resumen: 'Seguimos con la versión del Ejecutor' });
+      FallosLog.registrar({ rol: 'adaptacion', tipo: 'error', detalle: e.message, accion: 'se entrega la versión de Acción' });
+      finalTxt = aplicarFormato(trabajo);
+      emitir({ id: 'ada', rol: 'adaptacion', estado: 'ok', titulo: 'Adaptación · se omite', detalle: e.message, resumen: 'Se entrega la versión de Acción' });
     }
 
-    // 5. Controlador
-    emitir({ id: 'con', rol: 'controlador', estado: 'run', titulo: 'Controlador · empaquetando', detalle: '' });
-    try {
-      const out = await pedir('controlador', [
-        { role: 'system', content: SYS.controlador + '\n' + formato },
-        { role: 'user', content: 'OBJETIVO ORIGINAL DE ALFREDO:\n' + orden + ctx + '\n\nFORMATO EXIGIDO: ' + entrega + '\n' + formato + '\n\nMATERIAL FINAL DEL ENJAMBRE:\n' + pulido },
-      ], { maxTokens: 3500, temp: 0.25 });
-      const finalTxt = aplicarFormato(out.texto);
-      historial.resultado = finalTxt;
-      historial.entrega = entrega;
-      historial.artefacto = extraerArtefacto(finalTxt, entrega);
-      emitir({ id: 'con', rol: 'controlador', estado: 'ok', titulo: 'Controlador · resultado listo', detalle: finalTxt, resumen: resumir(finalTxt, 120) });
-    } catch (e) {
-      const finalTxt = aplicarFormato(pulido);
-      historial.resultado = finalTxt;
-      historial.entrega = entrega;
-      historial.artefacto = extraerArtefacto(finalTxt, entrega);
-      historial.error = historial.error || e.message;
-      emitir({ id: 'con', rol: 'controlador', estado: 'ok', titulo: 'Controlador · entrega de respaldo', detalle: finalTxt, resumen: 'Se entrega la versión pulida' });
-    }
-
+    historial.resultado = finalTxt;
+    historial.entrega = entrega;
+    historial.artefacto = extraerArtefacto(finalTxt, entrega);
     historial.ms = Date.now() - t0;
     return historial;
   },

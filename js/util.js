@@ -68,17 +68,24 @@ function extraerBloque(t, langs = []) {
 }
 
 function pareceHTML(s) {
-  const t = String(s || '').trim();
-  if (/<!doctype html|<html[\s>]/i.test(t)) return t;
-  const b = extraerBloque(s, ['html', 'htm', 'xml']);
-  if (b && /<(?:html|body|div|main|section|header|form|button|input)\b/i.test(b)) return b;
+  const raw = String(s || '');
+  const b = extraerBloque(raw, ['html', 'htm', 'xml']);
+  if (b && /<(?:!doctype\s+html|html|body|div|main|section|header|form|button|input)\b/i.test(b)) return b.trim();
+  const t = raw.trim();
+  const doc = t.match(/<!doctype\s+html[\s\S]*$/i) || t.match(/<html[\s>][\s\S]*$/i);
+  if (doc) {
+    let h = doc[0].trim();
+    const close = h.match(/([\s\S]*<\/html>)\s*[\s\S]*/i);
+    if (close) h = close[1].trim();
+    return h;
+  }
   return null;
 }
 
 function envolverHTML(frag) {
   let t = String(frag || '').trim();
   if (/<!doctype html|<html[\s>]/i.test(t)) return t;
-  return `<!doctype html><html lang="es-MX"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Enjambre 5</title><style>body{font-family:system-ui,sans-serif;margin:16px;background:#111;color:#eee}</style></head><body>${t}</body></html>`;
+  return `<!doctype html><html lang="es-MX"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Enjambre 7</title><style>body{font-family:system-ui,sans-serif;margin:16px;background:#111;color:#eee}</style></head><body>${t}</body></html>`;
 }
 
 function entregaDe(plan, orden) {
@@ -187,7 +194,8 @@ function pintarMenciones(texto) {
 
 
 function rolDe(id) {
-  if (id === 'arquitecto') id = 'estratega';
+  if (typeof ALIAS_ROL !== 'undefined' && ALIAS_ROL[id]) id = ALIAS_ROL[id];
+  if (id === 'arquitecto' || id === 'estratega') id = 'razonamiento';
   return (typeof ROLES !== 'undefined' && ROLES[id]) ? ROLES[id] : { id: id || '?', nombre: id || '?', inicial: '?', corto: '', color: '#888' };
 }
 
