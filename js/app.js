@@ -152,14 +152,36 @@ const App = {
     const d = document.createElement('details');
     d.className = 'paso ' + (p.estado || '');
     d.dataset.pid = p.id;
-    d.innerHTML = `<summary>${avHTML(p.rol, 'av-sm')}<span class="punto"></span><span>${escaparHTML(p.titulo || r.nombre)}</span>${p.resumen ? `<span class="resumen">${escaparHTML(p.resumen)}</span>` : ''}</summary><div class="paso-cuerpo"><pre>${escaparHTML(p.detalle || '…')}</pre></div>`;
+    d.innerHTML = `<summary>${avHTML(p.rol, 'av-sm')}<span class="punto"></span><span class="paso-tit">${escaparHTML(p.titulo || r.nombre)}</span>${p.resumen ? `<span class="resumen">${escaparHTML(p.resumen)}</span>` : ''}</summary><div class="paso-cuerpo"><pre>${escaparHTML(p.detalle || (p.estado === 'run' ? '…' : ''))}</pre></div>`;
+    if (p.estado === 'run' || p.estado === 'fail' || p.abrir || p.rol === 'percepcion') d.open = true;
     return d;
   },
   actualizarPaso(runId, paso) {
     const cont = $('#pasos-' + runId);
     if (!cont) return;
     let el = cont.querySelector(`[data-pid="${paso.id}"]`);
+    if (el && (paso.estado === 'run' || el.classList.contains('run'))) {
+      el.className = 'paso ' + (paso.estado || '');
+      const tit = el.querySelector('summary .paso-tit');
+      const r = rolDe(paso.rol);
+      if (tit) tit.textContent = paso.titulo || r.nombre;
+      let res = el.querySelector('summary .resumen');
+      if (paso.resumen) {
+        if (!res) {
+          res = document.createElement('span');
+          res.className = 'resumen';
+          el.querySelector('summary').appendChild(res);
+        }
+        res.textContent = paso.resumen;
+      } else if (res) res.textContent = '';
+      const pre = el.querySelector('pre');
+      if (pre) pre.textContent = paso.detalle || (paso.estado === 'run' ? '…' : '');
+      if (paso.estado === 'run' || paso.estado === 'fail' || paso.abrir || paso.rol === 'percepcion') el.open = true;
+      return;
+    }
+    const estabaAbierto = el ? el.open : false;
     const nuevo = this.nodoPaso(paso);
+    if (estabaAbierto) nuevo.open = true;
     if (el) el.replaceWith(nuevo);
     else cont.appendChild(nuevo);
   },
@@ -322,9 +344,12 @@ const App = {
             if (i >= 0) run.pasos[i] = paso;
           } else run.pasos.push(paso);
           this.actualizarPaso(run.id, paso);
-          if (paso.estado === 'run') this.setEstadoRol(paso.rol, 'pensando');
+          if (paso.estado === 'run') this.setEstadoRol(paso.rol, paso.detalle ? 'escribiendo' : 'pensando');
           else this.setEstadoRol(paso.rol, 'listo');
-          this.alFinal();
+          if (paso.estado !== 'run' || !this._streamScroll || Date.now() - this._streamScroll > 400) {
+            this._streamScroll = Date.now();
+            this.alFinal();
+          }
         },
       });
       Object.assign(run, {
@@ -340,6 +365,7 @@ const App = {
         error: run.error, modelos: run.modelos, tieneResultado: !!run.resultado,
         ms: run.ms, score: run.score, bloqueado: !!run.bloqueado,
         preview: String((run.artefacto && run.artefacto.contenido) || run.resultado || run.error || '').slice(0, 400),
+        latencias: hist.latencias || [],
       };
     } catch (e) {
       run.error = e.message || String(e);
@@ -384,6 +410,17 @@ const App = {
           $('#grpLista').appendChild(this.nodoMsg(tmp));
           this.alFinal();
         },
+        onDelta: (id, d) => {
+          this.setEstadoRol(id, 'escribiendo');
+          const tmp = temps[id];
+          if (!tmp) return;
+          tmp.texto = d.texto || '';
+          const n = $('#grpLista').querySelector(`[data-mid="${tmp.id}"]`);
+          if (!n) return;
+          const box = n.querySelector('.cm-t');
+          if (box) box.textContent = tmp.texto;
+          n.classList.add('trabajando');
+        },
         onListo: (item) => {
           this.setEstadoRol(item.rol, 'listo');
           const tmp = temps[item.rol];
@@ -394,7 +431,7 @@ const App = {
           const msg = { id: uid(), when: Date.now(), rol: item.rol, texto: item.texto, modelo: item.modelo };
           this.grupo.push(msg);
           $('#grpLista').appendChild(this.nodoMsg(msg));
-          window.__e5ultimoGrupo.respuestas.push({ rol: item.rol, ok: true, chars: (item.texto || '').length });
+          window.__e5ultimoGrupo.respuestas.push({ rol: item.rol, ok: true, chars: (item.texto || '').length, ms: item.ms, ttft: item.ttft, modelo: item.modelo, via: item.via });
           this.guardarGrupo();
           this.alFinal();
         },

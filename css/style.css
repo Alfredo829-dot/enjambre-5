@@ -226,3 +226,7 @@ table.metricas th:first-child,table.metricas td:first-child{text-align:left}
 table.metricas th{color:var(--m);font-weight:600;font-size:11px}
 .adjunto-nom{margin:4px 52px 0 52px;font-size:11.5px;color:#c4b5fd}
 .resultado.bloqueado .k{color:#fca5a5}
+
+.paso.run, .paso.fail{border-color:color-mix(in srgb,var(--c, var(--a)) 55%, var(--b))}
+.paso.fail>summary{color:#fecaca}
+.paso.run .paso-cuerpo pre:not(:empty)::after{content:"▍";color:var(--c,var(--a));animation:pulso 1s ease-in-out infinite}

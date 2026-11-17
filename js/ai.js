@@ -53,7 +53,7 @@ const ROLES = {
     modeloPref: 'qwen/qwen3.8-27b',
     respaldo: 'openai/gpt-oss-20b',
     keyPref: ['groq2', 'groq3', 'groq'],
-    razonamiento: 'none',
+    razonamiento: null,
     color: '#22c55e',
     fw: 207,
     col: 'img/col-accion.webp',
@@ -191,7 +191,9 @@ const AI = {
   modelosOk: null,
   modeloDe: {},
   estado: {},
-  timeoutMs: 45000,
+  timeoutMs: 16000,
+  timeoutRespaldoMs: 12000,
+  timeoutPollMs: 10000,
 
   nLlaves() {
     const k = this.claves();
@@ -213,13 +215,18 @@ const AI = {
     try { return t ? JSON.parse(t) : {}; } catch (e) { throw new Error('Respuesta no JSON'); }
   },
 
+  _esOss(modelo) { return /gpt-oss/i.test(String(modelo || '')); },
+
   _limpia(j) {
     const msg = (j.choices && j.choices[0] && j.choices[0].message) || {};
     let c = msg.content;
     if (Array.isArray(c)) c = c.map(x => x.text || x.content || '').join('');
     c = String(c || '').replace(/<think>[\s\S]*?<\/think>/g, '').trim();
-    if (!c && msg.reasoning) c = String(msg.reasoning).trim();
     return c;
+  },
+
+  _limpiaTexto(c) {
+    return String(c || '').replace(/<think>[\s\S]*?<\/think>/g, '').trim();
   },
 
   _msReintento(e, base) {
@@ -234,142 +241,269 @@ const AI = {
     return Number(u.total_tokens || 0) || (Number(u.prompt_tokens || 0) + Number(u.completion_tokens || 0));
   },
 
-  async _groq({ key, modelo, mensajes, maxTokens, temp, signal, razonamiento }) {
-    const body = { model: modelo, messages: mensajes, temperature: temp ?? 0.3 };
+  modeloDisponible(mod) {
+    if (!mod) return false;
+    if (!this.modelosOk) return !/^llama-3\.1-8b-instant$/i.test(mod);
+    return this.modelosOk.has(mod);
+  },
+
+  cadenaModelos(meta, forzar) {
+    const out = [];
+    const add = (m) => { if (m && !out.includes(m) && this.modeloDisponible(m)) out.push(m); };
+    add(forzar);
+    add(this.modeloDe[meta.id]);
+    add(meta.modeloPref);
+    add(meta.respaldo);
+    add('openai/gpt-oss-20b');
+    add('qwen/qwen3.8-27b');
+    add('llama-3.1-8b-instant');
+    return out;
+  },
+
+  async _leerSse(resp, { signal, onDelta }) {
+    const reader = resp.body.getReader();
+    const dec = new TextDecoder();
+    let buf = '', texto = '', tokens = 0, ttft = null;
+    const t0 = Date.now();
+    const aplicar = (j) => {
+      const d = (j.choices && j.choices[0] && j.choices[0].delta) || {};
+      const pieza = typeof d.content === 'string' ? d.content
+        : Array.isArray(d.content) ? d.content.map(x => x.text || x.content || '').join('') : '';
+      if (pieza) {
+        if (ttft == null) ttft = Date.now() - t0;
+        texto += pieza;
+        if (onDelta) onDelta({ texto, pieza, ttft });
+      }
+      if (j.usage) tokens = this._tokens(j);
+    };
+    while (true) {
+      if (signal && signal.aborted) {
+        try { await reader.cancel(); } catch (e) {}
+        const te = new Error('tiempo agotado');
+        te.timeout = true;
+        throw te;
+      }
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const lineas = buf.split('\n');
+      buf = lineas.pop();
+      for (const line of lineas) {
+        const s = line.trim();
+        if (!s.startsWith('data:')) continue;
+        const payload = s.slice(5).trim();
+        if (!payload || payload === '[DONE]') continue;
+        try { aplicar(JSON.parse(payload)); } catch (e) {}
+      }
+    }
+    if (buf.trim().startsWith('data:')) {
+      const payload = buf.trim().slice(5).trim();
+      if (payload && payload !== '[DONE]') {
+        try { aplicar(JSON.parse(payload)); } catch (e) {}
+      }
+    }
+    texto = this._limpiaTexto(texto);
+    if (!texto) {
+      const err = new Error('Respuesta vacía');
+      err.vacia = true;
+      throw err;
+    }
+    return { texto, tokens, ttft: ttft == null ? Date.now() - t0 : ttft };
+  },
+
+  async _groq({ key, modelo, mensajes, maxTokens, temp, signal, razonamiento, onDelta }) {
+    const body = { model: modelo, messages: mensajes, temperature: temp ?? 0.3, stream: true };
     if (maxTokens) body.max_tokens = maxTokens;
-    if (razonamiento) body.reasoning_effort = razonamiento;
-    const j = await this._json('https://api.groq.com/openai/v1/chat/completions', {
+    if (this._esOss(modelo)) {
+      body.reasoning_effort = razonamiento || 'low';
+      body.include_reasoning = false;
+    }
+    const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + key, 'User-Agent': 'Mozilla/5.0' },
       body: JSON.stringify(body),
-    }, signal);
-    const txt = this._limpia(j);
-    if (!txt) throw new Error('Respuesta vacía');
-    return { texto: txt, tokens: this._tokens(j) };
+      signal,
+    });
+    if (!r.ok) {
+      let t = '';
+      try { t = await r.text(); } catch (e) {}
+      const err = new Error('HTTP ' + r.status + ' ' + t.slice(0, 220));
+      err.status = r.status;
+      err.body = t.slice(0, 500);
+      const ra = r.headers.get('retry-after');
+      if (ra) err.retryAfter = ra;
+      throw err;
+    }
+    return this._leerSse(r, { signal, onDelta });
   },
 
-  async _pollinations(mensajes, signal, maxTokens = 1200) {
-    const j = await this._json('https://text.pollinations.ai/openai', {
+  async _pollinations(mensajes, signal, maxTokens = 800, onDelta) {
+    const r = await fetch('https://text.pollinations.ai/openai', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'openai', messages: mensajes, max_tokens: maxTokens }),
-    }, signal);
+      body: JSON.stringify({ model: 'openai', messages: mensajes, max_tokens: maxTokens, stream: true }),
+      signal,
+    });
+    if (!r.ok) {
+      let t = '';
+      try { t = await r.text(); } catch (e) {}
+      // some Pollinations paths don't stream; retry once without stream
+      if (r.status >= 400) {
+        const j = await this._json('https://text.pollinations.ai/openai', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model: 'openai', messages: mensajes, max_tokens: maxTokens }),
+        }, signal);
+        const txt = this._limpia(j);
+        if (!txt) throw new Error('Respuesta vacía');
+        if (onDelta) onDelta({ texto: txt, pieza: txt });
+        return { texto: txt, modelo: 'pollinations', via: 'pollinations', tokens: this._tokens(j) };
+      }
+      throw new Error('HTTP ' + r.status + ' ' + t.slice(0, 180));
+    }
+    const ctype = (r.headers.get('content-type') || '').toLowerCase();
+    if (ctype.includes('text/event-stream') || ctype.includes('text/plain')) {
+      try {
+        const out = await this._leerSse(r, { signal, onDelta });
+        return { texto: out.texto, modelo: 'pollinations', via: 'pollinations', tokens: out.tokens, ttft: out.ttft };
+      } catch (e) {
+        if (e.vacia || e.timeout) throw e;
+      }
+    }
+    const raw = await r.text();
+    let j;
+    try { j = JSON.parse(raw); } catch (e) { throw new Error('Respuesta no JSON'); }
     const txt = this._limpia(j);
     if (!txt) throw new Error('Respuesta vacía');
+    if (onDelta) onDelta({ texto: txt, pieza: txt });
     return { texto: txt, modelo: 'pollinations', via: 'pollinations', tokens: this._tokens(j) };
   },
 
-  async completar({ rol, mensajes, maxTokens = 1200, temp = 0.3, signal, modeloForzar, timeout }) {
+  async completar({ rol, mensajes, maxTokens = 800, temp = 0.3, signal, modeloForzar, timeout, onDelta }) {
     const meta = typeof rol === 'string' ? (ROLES[rol] || ROLES[ALIAS_ROL[rol]]) : rol;
     if (!meta) throw new Error('Rol desconocido');
-    let modelo = modeloForzar || this.modeloDe[meta.id] || meta.modeloPref;
     const ids = [...meta.keyPref];
     const k = this.claves();
     const errores = [];
-    const to = timeout || this.timeoutMs;
-    const env = senalConTimeout(signal, to);
+    const modelos = this.cadenaModelos(meta, modeloForzar);
     const t0 = Date.now();
     let tokens = 0;
+
+    const unIntento = async (mod, keyId, to) => {
+      const env = senalConTimeout(signal, to);
+      try {
+        if (typeof window !== 'undefined' && window.__e5forzar && window.__e5forzar.fallarLlamada) {
+          window.__e5forzar.fallarLlamada = false;
+          FallosLog.registrar({ rol: meta.id, tipo: 'forzado', detalle: 'Fallo forzado de prueba', accion: 'reintento con otra llave o respaldo' });
+          const err = new Error('Fallo forzado de prueba');
+          err.status = 599;
+          throw err;
+        }
+        const r = await this._groq({
+          key: k[keyId], modelo: mod, mensajes, maxTokens, temp,
+          signal: env.signal,
+          razonamiento: this._esOss(mod) ? (meta.razonamiento || 'low') : null,
+          onDelta,
+        });
+        this.estado[keyId] = 'ok';
+        this.estado[meta.id] = 'ok';
+        tokens = r.tokens || 0;
+        return { texto: r.texto, modelo: mod, via: keyId, rol: meta.id, tokens, ttft: r.ttft };
+      } finally {
+        env.cleanup();
+      }
+    };
+
     try {
-      const intentar = async (mod, razonamiento) => {
-        for (let vuelta = 0; vuelta < 4; vuelta++) {
-          let algunaPausa = false;
-          for (const id of ids) {
-            if (!k[id]) continue;
-            if ((this.pausa[id] || 0) > Date.now()) { algunaPausa = true; continue; }
-            try {
-              if (typeof window !== 'undefined' && window.__e5forzar && window.__e5forzar.fallarLlamada) {
-                window.__e5forzar.fallarLlamada = false;
-                FallosLog.registrar({ rol: meta.id, tipo: 'forzado', detalle: 'Fallo forzado de prueba', accion: 'reintento con otra llave o respaldo' });
-                const err = new Error('Fallo forzado de prueba');
-                err.status = 599;
-                throw err;
-              }
-              const r = await this._groq({
-                key: k[id], modelo: mod, mensajes, maxTokens, temp, signal: env.signal, razonamiento,
-              });
-              this.estado[id] = 'ok';
-              this.estado[meta.id] = 'ok';
-              tokens = r.tokens || 0;
-              return { texto: r.texto, modelo: mod, via: id, rol: meta.id, tokens };
-            } catch (e) {
-              if (signal && signal.aborted) throw new Error('cancelado');
-              if (env.signal.aborted && !(signal && signal.aborted)) {
-                const te = new Error('tiempo agotado (' + Math.round(to / 1000) + 's)');
-                te.timeout = true;
-                FallosLog.registrar({ rol: meta.id, tipo: 'timeout', detalle: te.message, accion: 'reintento o respaldo' });
-                errores.push(te);
-                this.estado[id] = 'err';
-                continue;
-              }
-              const msg = e.message || '';
-              if (/reasoning_effort is not supported/i.test(msg) && razonamiento) {
-                return intentar(mod, null);
-              }
-              if (e.status === 404 || /model_not_found|does not exist|not available/i.test(msg)) {
-                FallosLog.registrar({ rol: meta.id, tipo: 'modelo', detalle: 'Modelo no disponible: ' + mod, accion: 'cambio a respaldo' });
-                if (mod !== meta.respaldo) return intentar(meta.respaldo, meta.respaldo.includes('gpt-oss') ? 'low' : null);
-                errores.push(e);
-                this.estado[id] = 'err';
-                continue;
-              }
-              if (e.status === 429 || /HTTP 429|rate limit|too many requests/i.test(msg)) {
-                const ms = Math.min(20000, this._msReintento(e, 1200 * (2 ** vuelta)));
-                this.pausa[id] = Date.now() + ms;
-                this.estado[id] = 'prob';
-                algunaPausa = true;
-                FallosLog.registrar({ rol: meta.id, tipo: 'rate', detalle: 'Límite de Groq en una llave', accion: 'rotar llave y esperar ' + Math.round(ms / 1000) + 's' });
-                continue;
-              }
-              if (e.status === 599 || /Fallo forzado/i.test(msg)) {
-                errores.push(e);
-                this.estado[id] = 'prob';
-                continue;
-              }
+      for (let mi = 0; mi < modelos.length; mi++) {
+        const mod = modelos[mi];
+        const to = mi === 0 ? (timeout || this.timeoutMs) : this.timeoutRespaldoMs;
+        const keysVivas = ids.filter(id => k[id] && !((this.pausa[id] || 0) > Date.now()));
+        const keysTodas = ids.filter(id => k[id]);
+        const orden = keysVivas.length ? keysVivas.concat(keysTodas.filter(id => !keysVivas.includes(id))) : keysTodas;
+        for (const id of orden) {
+          if (signal && signal.aborted) throw new Error('cancelado');
+          try {
+            const out = await unIntento(mod, id, to);
+            if (out) {
+              out.ms = Date.now() - t0;
+              Metricas.rec(meta.id, { ms: out.ms, tokens: out.tokens || tokens, error: false });
+              return out;
+            }
+          } catch (e) {
+            if (signal && signal.aborted) throw new Error('cancelado');
+            const msg = e.message || '';
+            if (e.status === 429 || /HTTP 429|rate limit|too many requests/i.test(msg)) {
+              const ms = Math.min(2000, this._msReintento(e, 800));
+              this.pausa[id] = Date.now() + ms;
+              this.estado[id] = 'prob';
+              FallosLog.registrar({ rol: meta.id, tipo: 'rate', detalle: 'Límite de Groq en una llave', accion: 'rotar llave de inmediato' });
+              continue;
+            }
+            if (e.timeout || /tiempo agotado/i.test(msg)) {
+              FallosLog.registrar({ rol: meta.id, tipo: 'timeout', detalle: 'Tiempo agotado (' + Math.round(to / 1000) + 's) en ' + mod, accion: 'sigo con otra llave o modelo más rápido' });
               this.estado[id] = 'err';
               errores.push(e);
-              FallosLog.registrar({ rol: meta.id, tipo: 'error', detalle: msg.slice(0, 220), accion: 'probar otra llave o respaldo' });
+              break; // don't burn 16s on every key of a hanging model; switch model
             }
+            if (e.status === 404 || /model_not_found|does not exist|not available/i.test(msg)) {
+              FallosLog.registrar({ rol: meta.id, tipo: 'modelo', detalle: 'Modelo no disponible: ' + mod, accion: 'cambio a respaldo rápido' });
+              errores.push(e);
+              this.estado[id] = 'err';
+              break;
+            }
+            if (e.vacia || /Respuesta vacía/i.test(msg)) {
+              FallosLog.registrar({ rol: meta.id, tipo: 'vacio', detalle: 'El modelo no devolvió texto visible (' + mod + ')', accion: 'reintento con respaldo' });
+              errores.push(e);
+              this.estado[id] = 'err';
+              continue;
+            }
+            if (e.status === 599 || /Fallo forzado/i.test(msg)) {
+              errores.push(e);
+              this.estado[id] = 'prob';
+              continue;
+            }
+            this.estado[id] = 'err';
+            errores.push(e);
+            FallosLog.registrar({ rol: meta.id, tipo: 'error', detalle: msg.slice(0, 220), accion: 'probar otra llave o respaldo' });
           }
-          const waits = ids.map(id => (this.pausa[id] || 0) - Date.now()).filter(x => x > 0);
-          const wait = waits.length ? Math.min(20000, Math.min(...waits) + 200) : Math.min(20000, 1500 * (2 ** vuelta));
-          if (algunaPausa || waits.length) await esperar(wait);
-          else if (vuelta < 2) await esperar(800);
-          else break;
         }
-        return null;
-      };
+        const waits = ids.map(id => (this.pausa[id] || 0) - Date.now()).filter(x => x > 0);
+        if (waits.length && waits.length === ids.filter(id => k[id]).length) {
+          await esperar(Math.min(1500, Math.min(...waits) + 50));
+        }
+      }
 
-      let out = await intentar(modelo, meta.razonamiento);
-      if (!out && modelo !== meta.respaldo) {
-        out = await intentar(meta.respaldo, meta.respaldo.includes('gpt-oss') ? 'low' : null);
-      }
-      if (out) {
-        out.ms = Date.now() - t0;
-        Metricas.rec(meta.id, { ms: out.ms, tokens: out.tokens || tokens, error: false });
-        return out;
-      }
       try {
-        const p = await this._pollinations(mensajes, env.signal, Math.min(maxTokens, 2000));
-        this.estado.pollinations = 'ok';
-        p.rol = meta.id;
-        p.ms = Date.now() - t0;
-        FallosLog.registrar({ rol: meta.id, tipo: 'respaldo', detalle: 'Groq no respondió', accion: 'Pollinations' });
-        Metricas.rec(meta.id, { ms: p.ms, tokens: p.tokens || 0, error: false });
-        return p;
+        const envP = senalConTimeout(signal, this.timeoutPollMs);
+        try {
+          const p = await this._pollinations(mensajes, envP.signal, Math.min(maxTokens, 1200), onDelta);
+          this.estado.pollinations = 'ok';
+          p.rol = meta.id;
+          p.ms = Date.now() - t0;
+          FallosLog.registrar({ rol: meta.id, tipo: 'respaldo', detalle: 'Groq no respondió a tiempo', accion: 'Pollinations' });
+          Metricas.rec(meta.id, { ms: p.ms, tokens: p.tokens || 0, error: false });
+          return p;
+        } finally {
+          envP.cleanup();
+        }
       } catch (e) {
         const last = errores[errores.length - 1] || e;
         Metricas.rec(meta.id, { ms: Date.now() - t0, error: true });
-        throw new Error(last.message || 'Sin respuesta de las IAs');
+        const msg = (last && last.message) || 'Sin respuesta de las IAs';
+        const err = new Error(/tiempo agotado/i.test(msg) ? 'No alcanzaron a responder a tiempo. Revisa la red e inténtalo otra vez.' : msg);
+        err.causa = last;
+        throw err;
       }
     } finally {
-      env.cleanup();
+      /* per-attempt controllers already cleaned */
     }
   },
 
   pareceFlojo(texto, esperadoES = true) {
     const t = String(texto || '').trim();
-    if (t.length < 40) return true;
+    if (/^\s*\{/.test(t) && t.length >= 15) return false;
+    if (t.length < 24) return true;
     if (esperadoES && /[\u0600-\u06FF]/.test(t) && (t.match(/[\u0600-\u06FF]/g) || []).length > 20 && !/[áéíóúñ¿¡]/i.test(t)) return true;
     return false;
   },
@@ -379,7 +513,7 @@ const AI = {
     const meta = ROLES[opts.rol] || ROLES[ALIAS_ROL[opts.rol]] || opts.rol;
     if (meta && meta.respaldo && out.modelo === meta.modeloPref && this.pareceFlojo(out.texto)) {
       try {
-        const b = await this.completar({ ...opts, modeloForzar: meta.respaldo });
+        const b = await this.completar({ ...opts, modeloForzar: meta.respaldo, timeout: this.timeoutRespaldoMs });
         if (b && b.texto && b.texto.length >= (out.texto || '').length) return b;
       } catch (e) {}
     }
@@ -397,7 +531,7 @@ const AI = {
       const ids = new Set((j.data || []).map(m => m.id));
       this.modelosOk = ids;
       for (const rol of Object.values(ROLES)) {
-        this.modeloDe[rol.id] = ids.has(rol.modeloPref) ? rol.modeloPref : rol.respaldo;
+        this.modeloDe[rol.id] = ids.has(rol.modeloPref) ? rol.modeloPref : (ids.has(rol.respaldo) ? rol.respaldo : 'openai/gpt-oss-20b');
       }
     } catch (e) {
       for (const rol of Object.values(ROLES)) this.modeloDe[rol.id] = rol.modeloPref;
@@ -417,6 +551,7 @@ const AI = {
     return resumir(out.texto, 80);
   },
 };
+
 
 window.ROLES = ROLES;
 window.ORDEN_ROLES = ORDEN_ROLES;

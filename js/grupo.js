@@ -46,45 +46,59 @@ const Grupo = {
     }).join('\n');
   },
 
-  async responder(texto, historial, { onInicio, onListo, onError, signal } = {}) {
+  _slotLlave(id) {
+    const pref = ((ROLES[id] || {}).keyPref || [])[0];
+    return { groq: 0, groq2: 1, groq3: 2 }[pref] || 0;
+  },
+
+  async responder(texto, historial, { onInicio, onListo, onError, onDelta, signal } = {}) {
     const destinos = this.destinos(texto);
-    const turno = [];
-    const resultados = [];
-    for (const id of destinos) {
-      if (onInicio) onInicio(id);
+    const historialTxt = this.transcripcion(historial, 16) || '(vacío)';
+    destinos.forEach(id => { if (onInicio) onInicio(id); });
+
+    const porSlot = { 0: [], 1: [], 2: [] };
+    destinos.forEach(id => porSlot[this._slotLlave(id)].push(id));
+
+    const uno = async (id) => {
       const rol = ROLES[id];
       const msgs = [
         { role: 'system', content: SYS_GRUPO.base + '\n' + (SYS_GRUPO[id] || '') },
         {
           role: 'user',
           content:
-            'Historial del grupo:\n' + (this.transcripcion(historial, 16) || '(vacío)') +
-            (turno.length ? '\n\nRespuestas de este turno, ya publicadas:\n' + turno.join('\n') : '') +
+            'Historial del grupo:\n' + historialTxt +
             '\n\nNuevo mensaje de Alfredo:\n' + texto +
             '\n\nResponde solo como ' + rol.nombre + '. Máximo 6 frases o un bloque corto de código si hace falta.',
         },
       ];
       try {
-        const out = await AI.completarConRespaldo({
+        const out = await AI.completar({
           rol: id,
           mensajes: msgs,
-          maxTokens: 420,
+          maxTokens: 320,
           temp: 0.45,
           signal,
+          onDelta: onDelta ? (d) => onDelta(id, d) : undefined,
         });
-        const linea = rol.nombre + ': ' + out.texto;
-        turno.push(linea);
-        const item = { rol: id, texto: out.texto, modelo: out.modelo, via: out.via };
-        resultados.push(item);
+        const item = { rol: id, texto: out.texto, modelo: out.modelo, via: out.via, ms: out.ms, ttft: out.ttft };
         if (onListo) onListo(item);
+        return item;
       } catch (e) {
         FallosLog.registrar({ rol: id, tipo: 'error', detalle: e.message, accion: 'se informa en el chat' });
         const item = { rol: id, texto: 'No pude responder ahora: ' + (e.message || 'error'), error: true };
-        resultados.push(item);
         if (onError) onError(item);
+        return item;
       }
-    }
-    return resultados;
+    };
+
+    const tareas = destinos.map(id => (async () => {
+      const slot = this._slotLlave(id);
+      const idx = porSlot[slot].indexOf(id);
+      const espera = (idx * 180) + (slot * 50);
+      if (espera) await esperar(espera);
+      return uno(id);
+    })());
+    return Promise.all(tareas);
   },
 
   resumenParaEncargo(msgs) {

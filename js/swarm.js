@@ -78,16 +78,31 @@ const Swarm = {
       if (onPaso) onPaso(paso, historial);
     };
 
+    historial.latencias = [];
     const pedir = async (rol, mensajes, extra = {}) => {
-      const out = await AI.completarConRespaldo({
+      const out = await AI.completar({
         rol,
         mensajes,
-        maxTokens: extra.maxTokens ?? 1400,
+        maxTokens: extra.maxTokens ?? 800,
         temp: extra.temp ?? 0.3,
         signal,
         timeout: extra.timeout,
+        onDelta: extra.pasoId ? (d) => {
+          emitir({
+            id: extra.pasoId,
+            rol,
+            estado: 'run',
+            titulo: extra.tituloRun || ((ROLES[rol] || {}).nombre + ' · escribiendo'),
+            detalle: d.texto,
+            resumen: 'escribiendo…',
+            ronda: extra.ronda,
+            abrir: true,
+            ttft: d.ttft,
+          });
+        } : undefined,
       });
       historial.modelos[rol] = out.modelo + (out.via === 'pollinations' ? ' (respaldo)' : '');
+      historial.latencias.push({ rol, ms: out.ms, ttft: out.ttft, modelo: out.modelo, via: out.via, tokens: out.tokens });
       return out;
     };
 
@@ -95,36 +110,43 @@ const Swarm = {
     const adj = adjunto ? '\n\nADJUNTOS:\n' + adjunto : '';
 
     // 1. Percepción
-    emitir({ id: 'per', rol: 'percepcion', estado: 'run', titulo: 'Percepción · entendiendo el pedido', detalle: '' });
+    emitir({ id: 'per', rol: 'percepcion', estado: 'run', titulo: 'Percepción · entendiendo el pedido', detalle: '', abrir: true });
     let perc = { intencion: orden, resumen: orden, entrega: 'texto', tipo: 'otro', adjuntos: '', notas: '' };
     try {
       const out = await pedir('percepcion', [
         { role: 'system', content: SYS.percepcion },
         { role: 'user', content: 'ENCARGO:\n' + orden + ctx + adj },
-      ], { maxTokens: 700, temp: 0.15 });
+      ], { maxTokens: 320, temp: 0.15, pasoId: 'per', tituloRun: 'Percepción · entendiendo el pedido' });
       perc = extraerJSON(out.texto) || perc;
       perc.entrega = entregaDe(perc, orden);
       historial.entrega = perc.entrega;
-      emitir({ id: 'per', rol: 'percepcion', estado: 'ok', titulo: 'Percepción · pedido claro', detalle: out.texto, resumen: resumir((perc.intencion || perc.resumen || '') + ' · ' + perc.entrega, 120) });
+      emitir({ id: 'per', rol: 'percepcion', estado: 'ok', titulo: 'Percepción · pedido claro', detalle: out.texto, resumen: resumir((perc.intencion || perc.resumen || '') + ' · ' + perc.entrega, 120), abrir: true });
     } catch (e) {
-      FallosLog.registrar({ rol: 'percepcion', tipo: 'error', detalle: e.message, accion: 'se asume el encargo original como texto normalizado' });
-      emitir({ id: 'per', rol: 'percepcion', estado: 'ok', titulo: 'Percepción · se asume el pedido', detalle: e.message, resumen: 'Sigue con el texto original' });
+      FallosLog.registrar({ rol: 'percepcion', tipo: 'error', detalle: e.message, accion: 'se asume el encargo original y se muestra el fallo en la burbuja' });
+      emitir({
+        id: 'per', rol: 'percepcion', estado: 'fail', abrir: true,
+        titulo: 'Percepción · no alcanzó a responder',
+        detalle: 'No pude completar la lectura del pedido: ' + (e.message || 'error') + '\n\nSigo con el encargo original tal como lo escribiste.',
+        resumen: 'Sigo con el encargo original',
+      });
     }
 
     // 2. Razonamiento
-    emitir({ id: 'raz', rol: 'razonamiento', estado: 'run', titulo: 'Razonamiento · planeando', detalle: '' });
-    let planTxt = '', plan;
+    emitir({ id: 'raz', rol: 'razonamiento', estado: 'run', titulo: 'Razonamiento · planeando', detalle: '', abrir: true });
+    let planTxt = '', plan, planDeRescate = false;
     try {
       const out = await pedir('razonamiento', [
         { role: 'system', content: SYS.razonamiento },
         { role: 'user', content: 'ENCARGO:\n' + orden + ctx + adj + '\n\nPERCEPCIÓN:\n' + JSON.stringify(perc) },
-      ], { maxTokens: 900, temp: 0.2 });
+      ], { maxTokens: 700, temp: 0.2, pasoId: 'raz', tituloRun: 'Razonamiento · planeando' });
       planTxt = out.texto;
-      plan = extraerJSON(planTxt) || { objetivo: orden, tipo: perc.tipo || 'otro', entrega: perc.entrega, pasos: [], criterios: [], supuestos: [], camino: '', confianza: 0.6, notas: planTxt };
+      plan = extraerJSON(planTxt) || { objetivo: orden, tipo: perc.tipo || 'otro', entrega: perc.entrega, pasos: ['Producir el entregable pedido'], criterios: ['Cumplir el formato'], supuestos: [], camino: '', confianza: 0.6, notas: planTxt };
     } catch (e) {
-      emitir({ id: 'raz', rol: 'razonamiento', estado: 'fail', titulo: 'Razonamiento · no pudo planear', detalle: e.message, resumen: e.message });
-      historial.error = e.message;
-      return historial;
+      FallosLog.registrar({ rol: 'razonamiento', tipo: 'error', detalle: e.message, accion: 'se continúa con un plan mínimo' });
+      plan = { objetivo: orden, tipo: perc.tipo || 'otro', entrega: perc.entrega, pasos: ['Producir el entregable pedido'], criterios: ['Cumplir el formato pedido'], supuestos: ['Plan mínimo porque Razonamiento no alcanzó a responder'], camino: 'directo', confianza: 0.6, notas: '' };
+      planTxt = JSON.stringify(plan);
+      planDeRescate = true;
+      emitir({ id: 'raz', rol: 'razonamiento', estado: 'fail', titulo: 'Razonamiento · no alcanzó a responder', detalle: (e.message || 'error') + '\n\nSigo con un plan mínimo para no dejarte sin resultado.', resumen: 'Sigo con un plan mínimo', abrir: true });
     }
 
     if (profundo) {
@@ -133,7 +155,7 @@ const Swarm = {
         const ref = await pedir('razonamiento', [
           { role: 'system', content: SYS.razonamiento + '\nEstás en una pasada extra de análisis profundo: mejora el plan, no lo alargues de más, ajusta la confianza con honestidad.' },
           { role: 'user', content: 'ENCARGO:\n' + orden + '\n\nPLAN A REFINAR:\n' + planTxt },
-        ], { maxTokens: 900, temp: 0.2 });
+        ], { maxTokens: 700, temp: 0.2, pasoId: 'raz', tituloRun: 'Razonamiento · refinando' });
         const p2 = extraerJSON(ref.texto);
         if (p2 && Array.isArray(p2.pasos) && p2.pasos.length) {
           plan = p2;
@@ -149,10 +171,12 @@ const Swarm = {
     historial.entrega = entrega;
     const confianza = Number(plan.confianza);
     plan.confianza = Number.isFinite(confianza) ? Math.max(0, Math.min(1, confianza)) : 0;
-    emitir({
-      id: 'raz', rol: 'razonamiento', estado: 'ok', titulo: 'Razonamiento · plan listo',
-      detalle: planTxt, resumen: resumir('confianza ' + plan.confianza + ' · ' + (plan.objetivo || ''), 120),
-    });
+    if (!planDeRescate) {
+      emitir({
+        id: 'raz', rol: 'razonamiento', estado: 'ok', titulo: 'Razonamiento · plan listo',
+        detalle: planTxt, resumen: resumir('confianza ' + plan.confianza + ' · ' + (plan.objetivo || ''), 120),
+      });
+    }
 
     const formato = reglasEntrega(entrega);
     const planCompacto = JSON.stringify({
@@ -162,18 +186,18 @@ const Swarm = {
     });
 
     // 3. Supervisión
-    emitir({ id: 'sup', rol: 'supervision', estado: 'run', titulo: 'Supervisión · validando el plan', detalle: '' });
+    emitir({ id: 'sup', rol: 'supervision', estado: 'run', titulo: 'Supervisión · validando el plan', detalle: '', abrir: true });
     let superv = { aprobado: true, pasos_ok: true, confianza_ok: true, seguridad_ok: true, razones: [] };
     try {
       const out = await pedir('supervision', [
         { role: 'system', content: SYS.supervision },
         { role: 'user', content: 'ENCARGO:\n' + orden + '\n\nPLAN:\n' + planCompacto },
-      ], { maxTokens: 600, temp: 0.1 });
+      ], { maxTokens: 280, temp: 0.1, pasoId: 'sup', tituloRun: 'Supervisión · validando el plan' });
       superv = extraerJSON(out.texto) || superv;
       emitir({ id: 'sup', rol: 'supervision', estado: 'ok', titulo: 'Supervisión · revisión lista', detalle: out.texto, resumen: superv.aprobado === false ? 'observa problemas' : 'revisado' });
     } catch (e) {
       FallosLog.registrar({ rol: 'supervision', tipo: 'error', detalle: e.message, accion: 'se valida solo con reglas locales' });
-      emitir({ id: 'sup', rol: 'supervision', estado: 'ok', titulo: 'Supervisión · validación local', detalle: e.message, resumen: 'Sin respuesta del modelo; se usan reglas locales' });
+      emitir({ id: 'sup', rol: 'supervision', estado: 'fail', titulo: 'Supervisión · no alcanzó a responder', detalle: (e.message || 'error') + '\n\nSigo con las reglas locales (pasos, confianza y seguridad).', resumen: 'Validación local', abrir: true });
     }
 
     const razones = [];
@@ -237,7 +261,7 @@ const Swarm = {
             content: 'CORRECCIÓN. El score fue ' + score + ' (hace falta >= 0.8). Corrige exactamente estos fallos y entrega la versión completa, en formato ' + entrega + ':\n' + fallosPendientes,
           });
         }
-        const out = await pedir('accion', msgs, { maxTokens: 3500, temp: 0.3 });
+        const out = await pedir('accion', msgs, { maxTokens: 2500, temp: 0.3, pasoId: eid, tituloRun: r === 1 ? 'Acción · produciendo' : 'Acción · corrección ronda ' + r, ronda: r });
         trabajo = aplicarFormato(out.texto);
         if (profundo && r === 1) {
           try {
@@ -245,7 +269,7 @@ const Swarm = {
             const ref = await pedir('accion', [
               { role: 'system', content: SYS.accion + '\n' + formato + '\nPasada extra de análisis profundo: revisa tu entregable y mejora lo que falle, sin cambiar el formato.' },
               { role: 'user', content: 'OBJETIVO:\n' + orden + '\n\nTU ENTREGABLE:\n' + trabajo },
-            ], { maxTokens: 3500, temp: 0.25 });
+            ], { maxTokens: 2500, temp: 0.25, pasoId: eid, tituloRun: 'Acción · refinando', ronda: r });
             trabajo = aplicarFormato(ref.texto || trabajo);
           } catch (e) {
             FallosLog.registrar({ rol: 'accion', tipo: 'error', detalle: 'Refinamiento: ' + e.message, accion: 'se conserva la primera versión' });
@@ -268,7 +292,7 @@ const Swarm = {
         const out = await pedir('feedback', [
           { role: 'system', content: SYS.feedback + '\n' + formato },
           { role: 'user', content: 'OBJETIVO:\n' + orden + '\n\nFORMATO EXIGIDO: ' + entrega + '\n' + formato + '\n\nCRITERIOS:\n' + JSON.stringify(plan.criterios || []) + '\n\nENTREGABLE:\n' + trabajo },
-        ], { maxTokens: 800, temp: 0.15 });
+        ], { maxTokens: 400, temp: 0.15, pasoId: fid, tituloRun: 'Feedback · puntuando ronda ' + r, ronda: r });
         const j = extraerJSON(out.texto) || {};
         let s = Number(j.score);
         if (!Number.isFinite(s)) s = String(j.veredicto || '').toUpperCase() === 'PASS' ? 0.85 : 0.4;
@@ -296,8 +320,8 @@ const Swarm = {
         historial.veredictos.push({ ronda: r, score, pass: true, fallos: [], raw: 'feedback no disponible: ' + e.message, omitido: true });
         FallosLog.registrar({ rol: 'feedback', tipo: 'error', detalle: e.message, accion: 'se continúa con el entregable actual' });
         emitir({
-          id: fid, rol: 'feedback', estado: 'ok', titulo: 'Feedback · no respondió; seguimos', detalle: e.message,
-          resumen: 'Se continúa con el entregable actual', ronda: r,
+          id: fid, rol: 'feedback', estado: 'fail', titulo: 'Feedback · no alcanzó a responder', detalle: (e.message || 'error') + '\n\nSigo con el entregable actual.',
+          resumen: 'Sigo con el entregable actual', ronda: r, abrir: true,
         });
         break;
       }
@@ -319,7 +343,7 @@ const Swarm = {
       const out = await pedir('adaptacion', [
         { role: 'system', content: SYS.adaptacion + '\n' + formato },
         { role: 'user', content: 'OBJETIVO:\n' + orden + ctx + '\n\nFORMATO EXIGIDO: ' + entrega + '\n' + formato + '\n\nENTREGABLE:\n' + trabajo + extra },
-      ], { maxTokens: 3500, temp: score < umbral ? 0.3 : 0.55 });
+      ], { maxTokens: 2500, temp: score < umbral ? 0.3 : 0.55, pasoId: 'ada', tituloRun: score < umbral ? 'Adaptación · corrigiendo desvío' : 'Adaptación · puliendo' });
       finalTxt = aplicarFormato(out.texto || trabajo);
       emitir({ id: 'ada', rol: 'adaptacion', estado: 'ok', titulo: 'Adaptación · resultado listo', detalle: finalTxt, resumen: resumir(finalTxt, 120) });
     } catch (e) {
