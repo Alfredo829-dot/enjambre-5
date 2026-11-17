@@ -1,7 +1,7 @@
-const V = 'enjambre7-v4';
+const V = 'enjambre7-v5';
 const BASE = [
   './', 'index.html', 'css/style.css',
-  'js/util.js', 'js/keys.js', 'js/ai.js', 'js/swarm.js', 'js/grupo.js', 'js/app.js',
+  'js/util.js', 'js/keys.js', 'js/ai.js', 'js/swarm.js', 'js/grupo.js', 'js/builder.js', 'js/app.js',
   'manifest.json', 'bridge-src.txt', 'icons/icon-192.png', 'icons/icon-512.png',
   'img/col-percepcion.webp', 'img/col-razonamiento.webp', 'img/col-supervision.webp', 'img/col-accion.webp', 'img/col-feedback.webp', 'img/col-adaptacion.webp', 'img/col-fallos.webp',
   'img/av-percepcion.webp', 'img/av-razonamiento.webp', 'img/av-supervision.webp', 'img/av-accion.webp', 'img/av-feedback.webp', 'img/av-adaptacion.webp', 'img/av-fallos.webp'

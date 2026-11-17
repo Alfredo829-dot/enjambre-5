@@ -91,9 +91,15 @@
       <button type="button" class="ancho peligro" id="ajBorrar">Borrar historial</button>
     </div>
     <div class="panel">
+      <div class="titulo">GitHub (Pages y APK)</div>
+      <p class="hint" id="ajGithubEstado">El token se cifra con tu PIN y se queda en este teléfono, no en el repo. Sirve para publicar un sitio en GitHub Pages o para disparar el flujo que arma el APK.</p>
+      <button type="button" class="ancho" id="ajGithub">Guardar o cambiar token de GitHub</button>
+      <button type="button" class="ancho" id="ajGithubBorrar">Quitar token de este teléfono</button>
+    </div>
+    <div class="panel">
       <div class="titulo">Los 7 roles</div>
       <ul class="roles-info" id="ajRoles"></ul>
-      <p class="hint">Acción intenta primero Clow y Razonamiento intenta primero Hermes, en la computadora de Alfredo. Si no contestan a tiempo, se usa Groq (gratis) y, si Groq se satura, Pollinations. No se quitan los filtros de seguridad de los modelos.</p>
+      <p class="hint">Acción intenta primero Clow y Razonamiento intenta primero Hermes, en la computadora de Alfredo. Si no contestan a tiempo, se usa Groq (gratis) y, si Groq se satura, Pollinations. En sitios y apps, Acción va directo a Groq para no cortar el HTML. Solo hay tres líneas duras: nada sexual con menores, nada ilegal dañino (malware, armas, fraude) y no hacerse pasar por alguien real para engañar. Fuera de eso, el enjambre va directo, sin moralina.</p>
     </div>
     <button type="button" class="ancho" id="ajVolver">Volver</button>
   </section>
@@ -116,6 +122,7 @@
 <script src="js/ai.js"></script>
 <script src="js/swarm.js"></script>
 <script src="js/grupo.js"></script>
+<script src="js/builder.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

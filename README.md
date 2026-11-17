@@ -6,7 +6,7 @@ Siete agentes de IA coordinados, pensado para usarse en el celular. Arriba ves a
 
 1. Abre el sitio en el teléfono y escribe tu PIN de 6 números (el mismo de Craft Web). Solo se pide una vez en ese aparato.
 2. **Encargo:** escribes una orden. La cadena es Percepción → Razonamiento → Supervisión → Acción → Feedback → Adaptación. Gestión de Fallos está activa todo el tiempo (tiempos de espera, reintentos, otra llave o Pollinations, y un registro visible).
-   - Percepción entiende el pedido y el formato (`texto`, `html` o `python`).
+   - Percepción entiende el pedido y el formato (`texto`, `sitio`, `pwa`, `html` o `python`).
    - Razonamiento arma el plan con pasos y una confianza de 0 a 1. `@Estratega` y `@Arquitecto` siguen apuntando aquí.
    - Supervisión valida el plan (pasos, confianza ≥ 0.5, seguridad). Si no se sostiene, lo bloquea con razones y no se ejecuta.
    - Acción produce el entregable en el formato acordado.
@@ -33,3 +33,8 @@ Si Groq se satura hay reintentos, rotación de llaves y Pollinations como respal
 ## Clow y Hermes (en la computadora de Alfredo)
 
 Acción intenta primero **Clow** (OpenClaw en la caja) y Razonamiento intenta primero **Hermes**. Si no contestan en unos 20 s, o el puente no está publicado, el sitio usa Groq de respaldo. El secreto del puente va cifrado con el mismo PIN; la URL pública se descubre sola (sin el secreto). En la interfaz verás la etiqueta *Clow*, *Hermes* o *Groq (respaldo)*.
+
+
+## Sitio web y App (PWA)
+
+Si pides un sitio o una app, Acción entrega un HTML único, móvil y oscuro, con vista previa a pantalla completa, descarga `.html`, copia y, en PWA, un `.zip` (index, manifest, service worker e íconos). También puedes publicar en GitHub Pages o pulsar **Hacer APK**: el token de GitHub se cifra con tu PIN solo en el teléfono, se sube un repo con una cáscara Android (WebView) y un flujo de Actions arma un APK firmado (clave de sideload, no de Play Store) y lo deja en Releases. Tarda varios minutos. El enjambre solo frena en tres líneas duras: menores, delito dañino y hacerse pasar por alguien real para engañar.

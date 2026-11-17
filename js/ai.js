@@ -273,10 +273,11 @@ const AI = {
   async _leerSse(resp, { signal, onDelta }) {
     const reader = resp.body.getReader();
     const dec = new TextDecoder();
-    let buf = '', texto = '', tokens = 0, ttft = null;
+    let buf = '', texto = '', tokens = 0, ttft = null, finish = '';
     const t0 = Date.now();
     const aplicar = (j) => {
-      const d = (j.choices && j.choices[0] && j.choices[0].delta) || {};
+      const ch = (j.choices && j.choices[0]) || {};
+      const d = ch.delta || {};
       const pieza = typeof d.content === 'string' ? d.content
         : Array.isArray(d.content) ? d.content.map(x => x.text || x.content || '').join('') : '';
       if (pieza) {
@@ -284,6 +285,7 @@ const AI = {
         texto += pieza;
         if (onDelta) onDelta({ texto, pieza, ttft });
       }
+      if (ch.finish_reason) finish = ch.finish_reason;
       if (j.usage) tokens = this._tokens(j);
     };
     while (true) {
@@ -318,7 +320,7 @@ const AI = {
       err.vacia = true;
       throw err;
     }
-    return { texto, tokens, ttft: ttft == null ? Date.now() - t0 : ttft };
+    return { texto, tokens, ttft: ttft == null ? Date.now() - t0 : ttft, finish };
   },
 
   async _groq({ key, modelo, mensajes, maxTokens, temp, signal, razonamiento, onDelta }) {
@@ -478,7 +480,7 @@ const AI = {
     }
   },
 
-  async completar({ rol, mensajes, maxTokens = 800, temp = 0.3, signal, modeloForzar, timeout, onDelta }) {
+  async completar({ rol, mensajes, maxTokens = 800, temp = 0.3, signal, modeloForzar, timeout, onDelta, sinPuente }) {
     const meta = typeof rol === 'string' ? (ROLES[rol] || ROLES[ALIAS_ROL[rol]]) : rol;
     if (!meta) throw new Error('Rol desconocido');
     const ids = [...meta.keyPref];
@@ -488,7 +490,7 @@ const AI = {
     const t0 = Date.now();
     let tokens = 0;
 
-    if (!modeloForzar && (meta.id === 'accion' || meta.id === 'razonamiento')) {
+    if (!modeloForzar && !sinPuente && (meta.id === 'accion' || meta.id === 'razonamiento')) {
       const dest = meta.id === 'accion' ? 'clow' : 'hermes';
       try {
         const out = await this._puente({
@@ -532,7 +534,7 @@ const AI = {
         this.estado[keyId] = 'ok';
         this.estado[meta.id] = 'ok';
         tokens = r.tokens || 0;
-        return { texto: r.texto, modelo: mod, via: keyId, rol: meta.id, tokens, ttft: r.ttft };
+        return { texto: r.texto, modelo: mod, via: keyId, rol: meta.id, tokens, ttft: r.ttft, finish: r.finish };
       } finally {
         env.cleanup();
       }
@@ -541,7 +543,7 @@ const AI = {
     try {
       for (let mi = 0; mi < modelos.length; mi++) {
         const mod = modelos[mi];
-        const to = mi === 0 ? (timeout || this.timeoutMs) : this.timeoutRespaldoMs;
+        const to = mi === 0 ? (timeout || this.timeoutMs) : Math.max(this.timeoutRespaldoMs, (timeout && timeout > this.timeoutMs) ? timeout : this.timeoutRespaldoMs);
         const keysVivas = ids.filter(id => k[id] && !((this.pausa[id] || 0) > Date.now()));
         const keysTodas = ids.filter(id => k[id]);
         const orden = keysVivas.length ? keysVivas.concat(keysTodas.filter(id => !keysVivas.includes(id))) : keysTodas;

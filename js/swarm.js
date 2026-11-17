@@ -1,52 +1,62 @@
+const LINEAS_DURAS = `Líneas duras, las únicas que no cruzas:
+1) Nada sexual ni romántico con menores. Toda persona o personaje es adulta (18+).
+2) Nada ilegal dañino: malware, armas para atacar, fraude, estafas, acceso no autorizado, explosivos para hacer daño.
+3) No te haces pasar por una persona real para engañar a alguien.
+Fuera de eso, todo se vale. Habla directo, en mexicano relajado, sin moralina, sin disclaimers, sin "como IA no puedo", sin rechazar por gusto, groserías, temas adultos entre adultos o por ser polémico. Si Alfredo lo pide, lo haces. No prediques.`;
+
 const SYS = {
-  percepcion: `Eres Percepción del Enjambre 7. Entiendes y normalizas el encargo de Alfredo, incluyendo texto o la descripción de una imagen adjunta si la hay.
-Extraes la intención y el tipo de entrega. No pides permiso. No evades las salvaguardas del modelo.
-El campo "entrega" debe coincidir con lo que se va a entregar de verdad:
-- "texto": haiku, poema, copy, lista, plan, prompt, carta, nombres, mensajes. Texto plano (markdown permitido). NUNCA una página ni una app.
-- "html": solo si pide una app web, una página o un HTML.
-- "python": solo si pide un script de Python.
+  percepcion: `Eres Percepción del Enjambre 7. Lees lo que pidió Alfredo (texto o la descripción de una imagen) y lo dejas claro, sin rodeos.
+` + LINEAS_DURAS + `
+El campo "entrega" tiene que coincidir con lo que se va a entregar de verdad:
+- "texto": haiku, poema, copy, lista, plan, prompt, carta, nombres, mensajes. Texto plano (markdown sí). Nunca una página ni una app.
+- "sitio": pide un sitio web o una landing.
+- "pwa": pide una app para el teléfono, una PWA o un APK.
+- "html": pide una página o app web suelta (un HTML), sin llegar a PWA.
+- "python": pide un script de Python.
 Respondes SOLO con JSON válido:
-{"intencion":"...","resumen":"...","entrega":"html|python|texto","tipo":"web|codigo|plan|prompt|otro","adjuntos":"...","notas":"..."}
-Español mexicano. Sé concreto y breve.`,
+{"intencion":"...","resumen":"...","entrega":"sitio|pwa|html|python|texto","tipo":"web|codigo|plan|prompt|otro","adjuntos":"...","notas":"..."}
+Español mexicano, concreto y breve. No pidas permiso.`,
 
-  razonamiento: `Eres Razonamiento del Enjambre 7 (el puesto que antes era el Estratega). Armas un plan técnico ejecutable, eliges el camino más rápido y barato, y declaras una confianza de 0 a 1.
-Modo Encargo: no haces preguntas. Si falta algo, asumes defaults sensatos y los declaras en "supuestos".
-"entrega" debe respetar lo que detectó Percepción, salvo que el pedido original lo contradiga con claridad. En un haiku en español, 5-7-5 es una guía, no un criterio rígido. No evades las salvaguardas.
+  razonamiento: `Eres Razonamiento del Enjambre 7. Armas el plan más directo y barato, con confianza de 0 a 1.
+` + LINEAS_DURAS + `
+Modo Encargo: no hagas preguntas. Si falta algo, asume defaults razonables y ponlos en "supuestos".
+Si la entrega es "sitio" o "pwa", el plan incluye secciones o pantallas, datos (localStorage), y que el HTML único funcione en el teléfono a la primera.
+"entrega" respeta lo que vio Percepción, salvo que el pedido original lo contradiga clarísimo. En un haiku en español, 5-7-5 es guía, no dogma.
 Respondes SOLO con JSON válido:
-{"objetivo":"...","supuestos":["..."],"camino":"...","tipo":"web|codigo|plan|prompt|otro","entrega":"html|python|texto","pasos":["..."],"criterios":["..."],"confianza":0.0,"notas":"..."}
-confianza es un número entre 0 y 1. Español mexicano. Sé concreto y breve.`,
+{"objetivo":"...","supuestos":["..."],"camino":"...","tipo":"web|codigo|plan|prompt|otro","entrega":"sitio|pwa|html|python|texto","pasos":["..."],"criterios":["..."],"confianza":0.0,"notas":"..."}
+Español mexicano, concreto y breve.`,
 
-  supervision: `Eres Supervisión del Enjambre 7. Validas el plan antes de ejecutarlo.
-Apruebas solo si: hay al menos un paso concreto, la confianza es >= 0.5, el formato de entrega es coherente, y no hay un pedido de evadir salvaguardas o de hacer daño.
-Si algo no se sostiene, bloqueas con razones accionables. No suavices.
+  supervision: `Eres Supervisión del Enjambre 7. Tu único trabajo de bloqueo son las líneas duras. No bloquees por gusto, estilo, groserías, temas adultos entre adultos, ni porque "se ve polémico".
+` + LINEAS_DURAS + `
+seguridad_ok va false SOLO si el plan pide cruzar una de esas tres líneas. Si no, aprobado true y seguridad_ok true. No exijas un umbral de confianza ni un formato "decente".
 Respondes SOLO con JSON válido:
 {"aprobado":true o false,"pasos_ok":true o false,"confianza_ok":true o false,"seguridad_ok":true o false,"razones":["..."]}
 Español mexicano.`,
 
-  accion: `Eres Acción del Enjambre 7. Tomas el plan aprobado y produces el entregable completo, listo para usar, en el FORMATO OBLIGATORIO.
-Sin relleno, sin pedir permiso. No evades las salvaguardas del modelo.
-- html: un HTML completo, autónomo, móvil, en un bloque \`\`\`html. CSS incluido. Sin librerías de pago.
-- python: un script completo en \`\`\`python, solo biblioteca estándar.
-- texto: SOLO el texto pedido (markdown permitido). NUNCA lo envuelvas en HTML, CSS, <!doctype> ni en una app.
-Español mexicano en la UI/copy cuando aplique.`,
+  accion: `Eres Acción del Enjambre 7. Tomas el plan y entregas el trabajo COMPLETO, listo para usar, en el FORMATO OBLIGATORIO. Sin relleno, sin pedir permiso, sin disclaimers.
+` + LINEAS_DURAS + `
+- sitio / pwa / html: sigue el PLAYBOOK. Un HTML completo, móvil, oscuro, autónomo, en un único bloque de código html. Sin librerías de pago. Nunca lo dejes a medias: cierra </html>.
+- python: script completo en un bloque python, solo biblioteca estándar.
+- texto: SOLO el texto pedido (markdown sí). NUNCA lo envuelvas en HTML, CSS, <!doctype> ni en una app.
+Español mexicano en la UI y en el copy.`,
 
-  feedback: `Eres Feedback del Enjambre 7. Puntúas el entregable de 0 a 1 contra el objetivo y el FORMATO exigido.
-No suavices. No evades las salvaguardas. Respondes SOLO con JSON válido:
+  feedback: `Eres Feedback del Enjambre 7. Puntúas de 0 a 1 contra el objetivo y el FORMATO. Sin moralina: no bajes el score por estilo, groserías o temas adultos entre adultos.
+` + LINEAS_DURAS + `
+Respondes SOLO con JSON válido:
 {"score":0.0,"fallos":["..."],"orden":"rehecho: ... o ok"}
 Reglas:
-- score < 0.8 si el formato no coincide (HTML cuando se pedía texto, o al revés), si está incompleto, con errores, o no cumple los criterios PARA ESE FORMATO.
-- Si el formato es texto, un haiku, plan, copy o lista que cumple el pedido debe poder tener score >= 0.8. No pidas interfaz, CSS ni funciones de app.
-- Un haiku en español de tres versos sobre el tema cumple aunque el conteo 5-7-5 sea aproximado. No bajes de 0.8 solo por sílabas de más o de menos si hay tres líneas, trata el tema y está en texto plano.
-- Reserva scores < 0.8 para incumplimiento del pedido, formato equivocado (texto vs html) o errores graves.
-- Si el formato es html, juzga que sea una página/app usable y completa.
-Máximo 6 fallos. Español mexicano. score es un número entre 0 y 1.`,
+- score < 0.8 si el formato no coincide, si está incompleto (HTML sin </html>, JS roto), o si no cumple el pedido.
+- Si es texto, un haiku/plan/copy que cumple debe poder tener >= 0.8. No pidas interfaz ni CSS.
+- Un haiku en español de tres versos sobre el tema cumple aunque el 5-7-5 sea aproximado.
+- Si es sitio, pwa o html: tiene que ser usable, completo y sin errores de JS. Si hay una "prueba automática", tómalta en cuenta.
+Máximo 6 fallos. Español mexicano.`,
 
-  adaptacion: `Eres Adaptación del Enjambre 7. Tomas el mejor entregable disponible y lo dejas listo para Alfredo, respetando el FORMATO OBLIGATORIO.
+  adaptacion: `Eres Adaptación del Enjambre 7. Dejas el entregable listo para Alfredo, en el FORMATO OBLIGATORIO, completo (nada truncado).
+` + LINEAS_DURAS + `
 - Si el score fue >= 0.8: pule un poco y, si aporta, 1 a 3 extras que no rompan el objetivo ni el formato.
-- Si el score fue < 0.8: hay desvío. Corrige los fallos, alinea el resultado con el pedido original y entrega la versión completa.
-- html: SOLO un bloque \`\`\`html con el documento completo. python: SOLO un bloque \`\`\`python. texto: SOLO el texto pedido.
-Responde únicamente con el entregable. Sin saludo, sin "aquí tienes", sin explicar el score, sin preámbulo ni epílogo.
-No evades las salvaguardas. Español mexicano en la UI/copy cuando aplique.`,
+- Si el score fue < 0.8: corrige los fallos y entrega la versión completa.
+- sitio / pwa / html: SOLO el documento HTML completo. python: SOLO el script. texto: SOLO el texto pedido.
+Sin saludo, sin "aquí tienes", sin explicar el score. Español mexicano en la UI y el copy.`,
 };
 
 
@@ -91,6 +101,8 @@ const Swarm = {
         temp: extra.temp ?? 0.3,
         signal,
         timeout: extra.timeout,
+        sinPuente: extra.sinPuente,
+        modeloForzar: extra.modeloForzar,
         onDelta: extra.pasoId ? (d) => {
           emitir({
             id: extra.pasoId,
@@ -206,14 +218,8 @@ const Swarm = {
     }
 
     const razones = [];
-    const pasosOk = Array.isArray(plan.pasos) && plan.pasos.filter(Boolean).length >= 1;
-    if (!pasosOk) razones.push('El plan no tiene pasos concretos.');
-    if (!(plan.confianza >= 0.5)) razones.push('La confianza del plan es menor a 0.5 (' + plan.confianza + ').');
-    if (superv && superv.aprobado === false) {
-      (superv.razones || ['Supervisión no aprobó el plan']).forEach(r => { if (r && !razones.includes(r)) razones.push(r); });
-    }
     if (superv && superv.seguridad_ok === false) {
-      (superv.razones || ['El plan no pasa el filtro de seguridad']).forEach(r => { if (r && !razones.includes(r)) razones.push(r); });
+      (superv.razones || ['El plan cruza una línea dura']).forEach(r => { if (r && !razones.includes(r)) razones.push(String(r)); });
     }
     if (typeof window !== 'undefined' && window.__e5forzar && window.__e5forzar.bloquearSupervision) {
       razones.push('Bloqueo forzado de prueba.');
@@ -236,10 +242,15 @@ const Swarm = {
 
     const aplicarFormato = (txt) => {
       if (entrega === 'texto') return forzarTextoPlano(txt);
-      if (entrega === 'html') return pareceHTML(txt) || String(txt || '').trim();
+      if (entrega === 'html' || entrega === 'sitio' || entrega === 'pwa') return pareceHTML(txt) || String(txt || '').trim();
       if (entrega === 'python') return extraerBloque(txt, ['python', 'py']) || String(txt || '').trim();
       return String(txt || '').trim();
     };
+    const builder = esBuilder(entrega);
+    const accMax = builder ? 4096 : 2500;
+    const accTo = builder ? 90000 : undefined;
+    const accPuente = builder; // en sitios/apps vamos directo a Groq: el HTML es largo y Clow/Hermes se cortan a 20s
+
 
     // 4-5. Acción + Feedback, hasta 3 rondas (umbral 0.8)
     let trabajo = '';
@@ -266,15 +277,30 @@ const Swarm = {
             content: 'CORRECCIÓN. El score fue ' + score + ' (hace falta >= 0.8). Corrige exactamente estos fallos y entrega la versión completa, en formato ' + entrega + ':\n' + fallosPendientes,
           });
         }
-        const out = await pedir('accion', msgs, { maxTokens: 2500, temp: 0.3, pasoId: eid, tituloRun: r === 1 ? 'Acción · produciendo' : 'Acción · corrección ronda ' + r, ronda: r });
-        trabajo = aplicarFormato(out.texto);
+        const out = await pedir('accion', msgs, { maxTokens: accMax, temp: 0.3, timeout: accTo, sinPuente: accPuente, pasoId: eid, tituloRun: r === 1 ? 'Acción · produciendo' : 'Acción · corrección ronda ' + r, ronda: r });
+        let bruto = out.texto;
+        let finish = out.finish;
+        if (builder && typeof Builder !== 'undefined') {
+          let c = 0;
+          while (c < 3 && Builder.pareceCortado(bruto, entrega, finish)) {
+            c++;
+            emitir({ id: eid, rol: 'accion', estado: 'run', ronda: r, titulo: 'Acción · continuando (' + c + ')', detalle: aplicarFormato(bruto), resumen: 'el archivo se cortó, sigo', abrir: true });
+            const cont = await pedir('accion', [
+              { role: 'system', content: SYS.accion + '\n' + formato + '\nTe cortaste. Continúa EXACTAMENTE donde te quedaste, sin repetir lo ya escrito. Cierra el documento (</html>). Solo la continuación.' },
+              { role: 'user', content: 'FINAL DE LO YA ESCRITO:\n' + String(bruto).slice(-1200) + '\n\nContinúa ahora.' },
+            ], { maxTokens: 4096, temp: 0.2, timeout: accTo, sinPuente: true, pasoId: eid, tituloRun: 'Acción · continuando (' + c + ')', ronda: r });
+            bruto = Builder.coser(bruto, cont.texto || '');
+            finish = cont.finish;
+          }
+        }
+        trabajo = aplicarFormato(bruto);
         if (profundo && r === 1) {
           try {
             Metricas.iterar('accion', 1);
             const ref = await pedir('accion', [
               { role: 'system', content: SYS.accion + '\n' + formato + '\nPasada extra de análisis profundo: revisa tu entregable y mejora lo que falle, sin cambiar el formato.' },
               { role: 'user', content: 'OBJETIVO:\n' + orden + '\n\nTU ENTREGABLE:\n' + trabajo },
-            ], { maxTokens: 2500, temp: 0.25, pasoId: eid, tituloRun: 'Acción · refinando', ronda: r });
+            ], { maxTokens: accMax, temp: 0.25, timeout: accTo, sinPuente: accPuente, pasoId: eid, tituloRun: 'Acción · refinando', ronda: r });
             trabajo = aplicarFormato(ref.texto || trabajo);
           } catch (e) {
             FallosLog.registrar({ rol: 'accion', tipo: 'error', detalle: 'Refinamiento: ' + e.message, accion: 'se conserva la primera versión' });
@@ -294,9 +320,17 @@ const Swarm = {
       const fid = 'fb' + r;
       emitir({ id: fid, rol: 'feedback', estado: 'run', titulo: 'Feedback · puntuando ronda ' + r, detalle: '', ronda: r });
       try {
+        let pruebaTxt = '';
+        if (builder && typeof Builder !== 'undefined' && Builder.probarHTML) {
+          try {
+            const pr = await Builder.probarHTML(envolverHTML(trabajo));
+            pruebaTxt = '\n\nPRUEBA AUTOMÁTICA: ' + (pr.ok ? 'abrió sin errores de JS.' : ('errores de JS: ' + (pr.errores || []).join(' | ')));
+            if (!pr.ok) FallosLog.registrar({ rol: 'feedback', tipo: 'prueba', detalle: pruebaTxt, accion: 'corrige Acción si el score baja' });
+          } catch (e) { pruebaTxt = ''; }
+        }
         const out = await pedir('feedback', [
           { role: 'system', content: SYS.feedback + '\n' + formato },
-          { role: 'user', content: 'OBJETIVO:\n' + orden + '\n\nFORMATO EXIGIDO: ' + entrega + '\n' + formato + '\n\nCRITERIOS:\n' + JSON.stringify(plan.criterios || []) + '\n\nENTREGABLE:\n' + trabajo },
+          { role: 'user', content: 'OBJETIVO:\n' + orden + '\n\nFORMATO EXIGIDO: ' + entrega + '\n' + formato + '\n\nCRITERIOS:\n' + JSON.stringify(plan.criterios || []) + '\n\nENTREGABLE:\n' + trabajo + pruebaTxt },
         ], { maxTokens: 400, temp: 0.15, pasoId: fid, tituloRun: 'Feedback · puntuando ronda ' + r, ronda: r });
         const j = extraerJSON(out.texto) || {};
         let s = Number(j.score);
@@ -341,6 +375,15 @@ const Swarm = {
     // 6. Adaptación (empaqueta el resultado final)
     emitir({ id: 'ada', rol: 'adaptacion', estado: 'run', titulo: score < umbral ? 'Adaptación · corrigiendo desvío' : 'Adaptación · puliendo', detalle: '' });
     let finalTxt = trabajo;
+    if (builder && score >= umbral) {
+      FallosLog.registrar({ rol: 'adaptacion', tipo: 'omitido', detalle: 'El HTML ya cumplió; reenviarlo a Adaptación a menudo lo rompe o se come la cuota.', accion: 'se entrega la versión de Acción' });
+      emitir({ id: 'ada', rol: 'adaptacion', estado: 'ok', titulo: 'Adaptación · se conserva el HTML de Acción', detalle: 'El archivo ya cumplió. No lo reescribo para no cortarlo ni saturar la cuota.', resumen: 'Se entrega la versión de Acción' });
+      historial.resultado = finalTxt;
+      historial.entrega = entrega;
+      historial.artefacto = extraerArtefacto(finalTxt, entrega);
+      historial.ms = Date.now() - t0;
+      return historial;
+    }
     try {
       const extra = score < umbral
         ? '\nHay DESVÍO (score ' + score + ' < 0.8). Corrige los fallos y alinea el resultado con el pedido, sin cambiar el formato.\nFALLOS:\n' + fallosPendientes
@@ -348,9 +391,26 @@ const Swarm = {
       const out = await pedir('adaptacion', [
         { role: 'system', content: SYS.adaptacion + '\n' + formato },
         { role: 'user', content: 'OBJETIVO:\n' + orden + ctx + '\n\nFORMATO EXIGIDO: ' + entrega + '\n' + formato + '\n\nENTREGABLE:\n' + trabajo + extra },
-      ], { maxTokens: 2500, temp: score < umbral ? 0.3 : 0.55, pasoId: 'ada', tituloRun: score < umbral ? 'Adaptación · corrigiendo desvío' : 'Adaptación · puliendo' });
-      finalTxt = aplicarFormato(out.texto || trabajo);
-      emitir({ id: 'ada', rol: 'adaptacion', estado: 'ok', titulo: 'Adaptación · resultado listo', detalle: finalTxt, resumen: resumir(finalTxt, 120) });
+      ], { maxTokens: accMax, temp: score < umbral ? 0.3 : 0.25, timeout: accTo, sinPuente: accPuente, modeloForzar: builder ? 'qwen/qwen3.8-27b' : undefined, pasoId: 'ada', tituloRun: score < umbral ? 'Adaptación · corrigiendo desvío' : 'Adaptación · puliendo' });
+      const candidato = aplicarFormato(out.texto || trabajo);
+      const calidad = (h) => {
+        let s = 0;
+        const x = String(h || '');
+        if (/<!doctype html/i.test(x)) s += 2;
+        if (/<\/html>/i.test(x)) s += 2;
+        if (/<style/i.test(x) && /<body/i.test(x)) s += 2;
+        if (x.length > 800) s += 1;
+        if (/soy la ia/i.test(x) || (x.match(/<body/gi) || []).length > 2) s -= 3;
+        return s;
+      };
+      if (builder && calidad(candidato) < calidad(trabajo)) {
+        finalTxt = trabajo;
+        FallosLog.registrar({ rol: 'adaptacion', tipo: 'calidad', detalle: 'La pulida rompió el HTML; me quedo con la de Acción.', accion: 'se conserva Acción' });
+        emitir({ id: 'ada', rol: 'adaptacion', estado: 'ok', titulo: 'Adaptación · se conserva el HTML de Acción', detalle: finalTxt, resumen: 'Se conserva la versión de Acción' });
+      } else {
+        finalTxt = candidato;
+        emitir({ id: 'ada', rol: 'adaptacion', estado: 'ok', titulo: 'Adaptación · resultado listo', detalle: finalTxt, resumen: resumir(finalTxt, 120) });
+      }
     } catch (e) {
       FallosLog.registrar({ rol: 'adaptacion', tipo: 'error', detalle: e.message, accion: 'se entrega la versión de Acción' });
       finalTxt = aplicarFormato(trabajo);
@@ -367,3 +427,4 @@ const Swarm = {
 
 window.Swarm = Swarm;
 window.SYS_ENJAMBRE = SYS;
+window.LINEAS_DURAS = LINEAS_DURAS;

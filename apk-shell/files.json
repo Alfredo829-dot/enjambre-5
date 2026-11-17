@@ -1,0 +1,13 @@
+{
+  "files": [
+    "settings.gradle",
+    "build.gradle",
+    "gradle.properties",
+    "app/build.gradle",
+    "app/src/main/AndroidManifest.xml",
+    "app/src/main/java/mx/enjambre/app/MainActivity.java",
+    "app/src/main/res/drawable/ic_launcher.xml",
+    ".github/workflows/build-apk.yml",
+    "README.md"
+  ]
+}

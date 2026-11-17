@@ -203,44 +203,113 @@ const App = {
     const entrega = run.entrega || (run.artefacto && run.artefacto.tipo) || '';
     const art = run.artefacto && run.artefacto.tipo ? run.artefacto : extraerArtefacto(run.resultado || '', entrega);
     const k = bloqueado ? 'SUPERVISIÓN BLOQUEÓ EL PLAN' : (run.error && !run.resultado ? 'NO SE PUDO COMPLETAR' : 'RESULTADO');
-    const esHtml = !bloqueado && art && art.tipo === 'html' && entrega !== 'texto' && art.contenido;
+    const tipoArt = (art && art.tipo) || entrega;
+    const esHtml = !bloqueado && art && art.contenido && esBuilder(tipoArt) && entrega !== 'texto';
     const texto = bloqueado
       ? (run.error || 'El plan no se aprobó.')
       : (esHtml ? '' : ((art && art.contenido) ? art.contenido : (run.resultado || run.error || '')));
-    box.innerHTML = `<div class="k">${k}</div>` + (texto ? `<div class="t">${escaparHTML(texto)}</div>` : '');
+    const etiqueta = tipoArt === 'pwa' ? 'APP (PWA)' : tipoArt === 'sitio' ? 'SITIO WEB' : k;
+    box.innerHTML = `<div class="k">${bloqueado || (run.error && !run.resultado) ? k : etiqueta}</div>` + (texto ? `<div class="t">${escaparHTML(texto)}</div>` : '');
     if (esHtml) {
       const prev = document.createElement('div');
       prev.className = 'previa';
-      prev.innerHTML = `<div class="previa-tit">Vista previa</div>`;
+      prev.innerHTML = `<div class="previa-tit">${tipoArt === 'pwa' ? 'Vista previa de la app' : 'Vista previa del sitio'} <button type="button" class="linkish" data-act="full">Pantalla completa</button></div>`;
       const ifr = document.createElement('iframe');
       ifr.setAttribute('sandbox', 'allow-scripts allow-forms');
       ifr.title = 'Vista previa del resultado';
-      ifr.srcdoc = art.contenido;
+      const blobUrl = URL.createObjectURL(new Blob([art.contenido], { type: 'text/html' }));
+      ifr.src = blobUrl;
       prev.appendChild(ifr);
+      prev.querySelector('[data-act="full"]').onclick = () => Builder.abrirPrevia(art.contenido, tipoArt === 'pwa' ? 'App' : 'Sitio');
       box.appendChild(prev);
     }
     if (bloqueado) return box;
     const bts = document.createElement('div');
     bts.className = 'cm-bts';
-    const bCopiar = document.createElement('button');
-    bCopiar.type = 'button'; bCopiar.textContent = '📋 Copiar';
-    bCopiar.onclick = () => copiar(art && art.contenido ? art.contenido : texto);
-    bts.appendChild(bCopiar);
-    const bDesc = document.createElement('button');
-    bDesc.type = 'button';
-    if (art && art.tipo === 'html' && entrega !== 'texto') {
-      bDesc.textContent = '⬇ Descargar .html';
-      bDesc.onclick = () => descargar(art.contenido, 'enjambre-7.html', 'text/html;charset=utf-8');
+    const addB = (label, fn) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.textContent = label; b.onclick = fn;
+      bts.appendChild(b);
+      return b;
+    };
+    addB('📋 Copiar', () => copiar(art && art.contenido ? art.contenido : texto));
+    if (esHtml) {
+      addB('⬇ Descargar .html', () => descargar(art.contenido, (tipoArt === 'pwa' ? 'app' : 'sitio') + '.html', 'text/html;charset=utf-8'));
+      if (tipoArt === 'pwa' || tipoArt === 'html') {
+        addB('⬇ Descargar .zip (PWA)', async () => {
+          try {
+            const pack = await Builder.empaquetarPWA(art.contenido);
+            descargar(pack.zip, pack.slug + '-pwa.zip', 'application/zip');
+            toast('Listo el .zip de la PWA');
+          } catch (e) { toast(e.message || 'No pude armar el zip'); }
+        });
+      }
+      addB('Publicar en GitHub Pages', () => this.publicarPages(art, run));
+      addB('Hacer APK', () => this.hacerApk(art, run));
     } else if (art && art.tipo === 'python') {
-      bDesc.textContent = '⬇ Descargar .py';
-      bDesc.onclick = () => descargar(art.contenido, 'enjambre-7.py', 'text/x-python;charset=utf-8');
+      addB('⬇ Descargar .py', () => descargar(art.contenido, 'enjambre-7.py', 'text/x-python;charset=utf-8'));
     } else {
-      bDesc.textContent = '⬇ Descargar .txt';
-      bDesc.onclick = () => descargar(art && art.contenido ? art.contenido : texto, 'enjambre-7.txt');
+      addB('⬇ Descargar .txt', () => descargar(art && art.contenido ? art.contenido : texto, 'enjambre-7.txt'));
     }
-    bts.appendChild(bDesc);
     box.appendChild(bts);
+    const est = document.createElement('p');
+    est.className = 'estado pub-est';
+    est.hidden = true;
+    box.appendChild(est);
+    box._pubEst = est;
     return box;
+  },
+  tokenGithubOPedir() {
+    const t = (AI.claves() || {}).github;
+    if (t) return Promise.resolve(t);
+    return new Promise((resolve, reject) => {
+      toast('Primero guarda un token de GitHub (con tu PIN)');
+      Llaves.pedirGithub(() => {
+        const n = (AI.claves() || {}).github;
+        if (n) resolve(n); else reject(new Error('No se guardó el token'));
+      });
+    });
+  },
+  async publicarPages(art, run) {
+    const box = document.querySelector('#run-' + run.id + ' .resultado') || null;
+    const est = box && box._pubEst;
+    try {
+      const token = await this.tokenGithubOPedir();
+      if (est) { est.hidden = false; est.className = 'estado pub-est'; est.textContent = 'Publicando…'; }
+      const pack = (art.tipo === 'pwa') ? await Builder.empaquetarPWA(art.contenido) : null;
+      const files = pack ? { 'index.html': pack.index, 'manifest.json': pack.files['manifest.json'], 'sw.js': pack.files['sw.js'] } : { 'index.html': art.contenido };
+      if (pack) {
+        // icons as... skip binary in pages if awkward? include them: we need files as strings or bytes — Builder.subirRepo supports Uint8Array
+        files['icon-192.png'] = pack.files['icon-192.png'];
+        files['icon-512.png'] = pack.files['icon-512.png'];
+      }
+      const name = 'enjambre-sitio-' + Builder.slug(Builder.tituloDe(art.contenido, 'sitio'));
+      const r = await Builder.publicarPages(token, { name, files, onEstado: s => { if (est) est.textContent = s; } });
+      if (est) {
+        est.className = 'estado ok pub-est';
+        est.innerHTML = 'Páginas: <a href="' + escaparHTML(r.pages) + '" target="_blank" rel="noopener">' + escaparHTML(r.pages) + '</a>';
+      }
+      toast('Sitio publicado');
+    } catch (e) { if (est) { est.hidden = false; est.className = 'estado err pub-est'; est.textContent = e.message; } toast(e.message || 'No se pudo publicar'); }
+  },
+  async hacerApk(art, run) {
+    const box = document.querySelector('#run-' + run.id + ' .resultado') || null;
+    const est = box && box._pubEst;
+    try {
+      const token = await this.tokenGithubOPedir();
+      if (est) { est.hidden = false; est.className = 'estado pub-est'; est.textContent = 'Preparando APK…'; }
+      const r = await Builder.publicarAPK(token, {
+        html: art.contenido,
+        nombre: Builder.tituloDe(art.contenido, 'App de Enjambre'),
+        onEstado: s => { if (est) est.textContent = s; },
+      });
+      if (est) {
+        est.className = 'estado ok pub-est';
+        est.innerHTML = 'APK listo (' + Math.round((r.ms || 0) / 1000) + 's): <a href="' + escaparHTML(r.apk) + '" target="_blank" rel="noopener">Descargar APK</a>'
+          + (r.release ? ' · <a href="' + escaparHTML(r.release) + '" target="_blank" rel="noopener">Release</a>' : '');
+      }
+      toast('APK listo');
+    } catch (e) { if (est) { est.hidden = false; est.className = 'estado err pub-est'; est.textContent = e.message; } toast(e.message || 'No se pudo hacer el APK'); }
   },
 
   pintarGrupo() {
@@ -272,9 +341,9 @@ const App = {
   ideas() {
     const items = [
       'Escribe un haiku en español sobre el café. Solo el haiku, nada más.',
-      'App web de una sola página: un botón grande que cuenta clics y muestra el número. Un solo HTML, autónomo, móvil, fondo oscuro.',
+      'Sitio web: landing para una taquería en CDMX que vende por WhatsApp. Hero, menú breve, horarios, botón de WhatsApp y un formulario de pedidos. Un solo HTML, móvil, fondo oscuro, listo al abrir.',
+      'App PWA: lista de pendientes (todo) que se guarda en el teléfono. Agregar, marcar hechas y borrar. Un solo HTML autónomo, móvil, fondo oscuro.',
       'Plan de marketing de 7 días para una taquería en CDMX que vende por WhatsApp. Con mensajes listos.',
-      'Script de Python que cuente palabras, líneas y las 10 palabras más usadas de un texto. Sin librerías externas.',
     ];
     const c = $('#encIdeas');
     c.innerHTML = items.map(() => `<button type="button"></button>`).join('');
@@ -376,6 +445,8 @@ const App = {
         error: run.error, modelos: run.modelos, tieneResultado: !!run.resultado,
         ms: run.ms, score: run.score, bloqueado: !!run.bloqueado,
         preview: String((run.artefacto && run.artefacto.contenido) || run.resultado || run.error || '').slice(0, 400),
+        contenido: (run.artefacto && run.artefacto.contenido) || run.resultado || '',
+        artefactoTipo: (run.artefacto && run.artefacto.tipo) || '',
         latencias: hist.latencias || [],
       };
     } catch (e) {
@@ -538,6 +609,11 @@ const Ajustes = {
       p.textContent = 'Llaves activas en este teléfono: ' + AI.nLlaves() + ' de Groq.';
       caja.appendChild(p);
     }
+    const ghBox = $('#ajGithubEstado');
+    if (ghBox) {
+      const ok = !!(AI.claves() || {}).github;
+      ghBox.textContent = ok ? 'Hay un token de GitHub guardado en este teléfono (cifrado con tu PIN).' : 'Aún no hay token de GitHub en este teléfono. Hace falta para Publicar en Pages o Hacer APK.';
+    }
     const est = $('#ajEstado');
     const filas = [
       ...['groq', 'groq2', 'groq3'].map((id, i) => ({
@@ -636,6 +712,15 @@ window.addEventListener('DOMContentLoaded', async () => {
     Ajustes.pintar();
     Ajustes.pintarFallos();
     toast('Historial borrado');
+  };
+  const ajGh = $('#ajGithub');
+  if (ajGh) ajGh.onclick = () => Llaves.pedirGithub(() => Ajustes.pintar());
+  const ajGhB = $('#ajGithubBorrar');
+  if (ajGhB) ajGhB.onclick = () => {
+    if (!confirm('¿Quitar el token de GitHub de este teléfono?')) return;
+    Llaves.borrarGithub();
+    Ajustes.pintar();
+    toast('Token quitado de este teléfono');
   };
   $('#ajProbar').onclick = async () => {
     const est = $('#ajProbarEst');

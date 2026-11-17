@@ -88,27 +88,54 @@ function envolverHTML(frag) {
   return `<!doctype html><html lang="es-MX"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Enjambre 7</title><style>body{font-family:system-ui,sans-serif;margin:16px;background:#111;color:#eee}</style></head><body>${t}</body></html>`;
 }
 
+function esBuilder(entrega) {
+  const e = String(entrega || '').toLowerCase();
+  return e === 'sitio' || e === 'pwa' || e === 'html';
+}
+
 function entregaDe(plan, orden) {
   const raw = String((plan && (plan.entrega || plan.tipo)) || '').toLowerCase().trim();
-  let e = raw;
-  if (['htm', 'web', 'webpage', 'pagina', 'página', 'app', 'sitio'].includes(e)) e = 'html';
+  let e = raw.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  if (['pwa', 'apk', 'android'].includes(e)) e = 'pwa';
+  if (['sitio', 'landing', 'webpage', 'website', 'pagina', 'web'].includes(e)) e = 'sitio';
+  if (['htm', 'app'].includes(e)) e = 'html';
   if (e === 'py') e = 'python';
   if (e === 'plan' || e === 'prompt' || e === 'copy' || e === 'otro') e = 'texto';
-  if (e !== 'html' && e !== 'python' && e !== 'texto') e = 'texto';
+  if (!['html', 'python', 'texto', 'sitio', 'pwa'].includes(e)) e = 'texto';
   const o = String(orden || '');
-  const pideApp = /\b(html|css|app web|página web|pagina web|sitio web|web app|aplicación web|aplicacion web|interfaz|localStorage)\b/i.test(o);
+  const pidePwa = /\b(pwa|apk|app para (el )?celular|app para (el )?telefono|aplicaci[oó]n instalable|instalar en el tel[eé]fono)\b/i.test(o)
+    || /\b(hazme|arma|crea|quiero|necesito)\b[\s\S]{0,40}\b(una? )?app\b/i.test(o);
+  const pideSitio = /\b(sitio web|landing|p[aá]gina web|website|pagina de aterrizaje)\b/i.test(o);
+  const pideHtml = /\b(html|css|app web|web app|aplicaci[oó]n web|interfaz|localStorage)\b/i.test(o);
   const pidePy = /\b(python|\.py\b|script de python)\b/i.test(o);
-  const pideTexto = /\b(haiku|poema|poesía|poesia|copy\b|eslogan|slogan|lista de|nombres para|prompt\b|plan de|guion|guión|mensaje[s]? listo|carta\b)\b/i.test(o);
-  if (pideTexto && !pideApp && !pidePy) return 'texto';
-  if (e === 'html' || e === 'python') return e;
-  if (pideApp) return 'html';
+  const pideTexto = /\b(haiku|poema|poes[ií]a|copy\b|eslogan|slogan|lista de|nombres para|prompt\b|plan de|guion|gui[oó]n|mensaje[s]? listo|carta\b)\b/i.test(o);
+  if (pideTexto && !pideHtml && !pideSitio && !pidePwa && !pidePy) return 'texto';
+  if (e === 'pwa' || e === 'sitio' || e === 'html' || e === 'python') return e;
+  if (pidePwa) return 'pwa';
+  if (pideSitio) return 'sitio';
+  if (pideHtml) return 'html';
   if (pidePy) return 'python';
   return e;
 }
 
+const PLAYBOOK_BUILDER = `PLAYBOOK PARA SITIO / APP (como se construye aquí):
+- Un solo archivo HTML móvil primero, listo al abrir en el teléfono. CSS y JS van incrustados. Sin paso de build, sin frameworks, sin CDN de pago, sin librerías de pago.
+- UI oscura y moderna, tipografía de sistema, áreas táctiles de por lo menos 44px, contraste legible, idioma es-MX, viewport, theme-color.
+- Accesible: labels en inputs, botones con texto o aria-label, foco visible, no depende solo del color.
+- Datos en localStorage. Si el usuario pide IA dentro de la app, usa Groq o Pollinations gratis; las llaves las escribe el usuario, NUNCA las dejes hardcodeadas.
+- El archivo va COMPLETO, nunca truncado: empieza con <!doctype html> y cierra con </html>. Si te quedas corto, cierra bien lo que alcanzaste; el sistema te pedirá continuar.
+- Tiene que funcionar a la primera, sin errores de JS, en un teléfono.
+- Entrega SOLO el documento HTML completo (doctype hasta </html>), en un unico bloque de codigo html, sin preambulo.`;
+
 function reglasEntrega(entrega) {
+  if (entrega === 'sitio') {
+    return 'FORMATO OBLIGATORIO: Sitio web. ' + PLAYBOOK_BUILDER + '\nEs una landing o sitio, no una app con manifiesto. Secciones claras (hero, beneficios, prueba, contacto o lo que pida el encargo).';
+  }
+  if (entrega === 'pwa') {
+    return 'FORMATO OBLIGATORIO: App (PWA). ' + PLAYBOOK_BUILDER + '\nEs una app que se usa y se guarda en el teléfono. El HTML debe funcionar solo; el sistema arma el manifest, el service worker, el ícono y el .zip. Si hay lista, formulario o estado, persístelo en localStorage.';
+  }
   if (entrega === 'html') {
-    return 'FORMATO OBLIGATORIO: app o página web. Entrega un HTML completo, autónomo, móvil, en un bloque ```html. CSS incluido. Sin librerías de pago.';
+    return 'FORMATO OBLIGATORIO: app o página web. ' + PLAYBOOK_BUILDER;
   }
   if (entrega === 'python') {
     return 'FORMATO OBLIGATORIO: un script de Python completo en un bloque ```python, solo con la biblioteca estándar.';
@@ -163,10 +190,10 @@ function extraerArtefacto(texto, entrega) {
     const py = extraerBloque(texto, ['python', 'py']);
     return { tipo: 'python', contenido: py || String(texto || '').trim(), texto };
   }
-  if (e === 'html') {
+  if (e === 'html' || e === 'sitio' || e === 'pwa') {
     const html = pareceHTML(texto);
-    if (html) return { tipo: 'html', contenido: envolverHTML(html), texto };
-    return { tipo: 'html', contenido: envolverHTML(String(texto || '').trim()), texto };
+    const contenido = envolverHTML(html || String(texto || '').trim());
+    return { tipo: e, contenido, texto };
   }
   const html = pareceHTML(texto);
   if (html) return { tipo: 'html', contenido: envolverHTML(html), texto };
@@ -223,4 +250,4 @@ function modeloCorto(rol, modelo, via) {
   return String(m).split('/').pop();
 }
 
-window.Util = { toast, escaparHTML, uid, esperar, descargar, copiar, autoAlto, extraerJSON, extraerBloque, pareceHTML, envolverHTML, extraerArtefacto, entregaDe, reglasEntrega, extraerTextoDeHTML, forzarTextoPlano, resumir, ahoraCorto, pintarMenciones, rolDe, avHTML, modeloCorto };
+window.Util = { toast, escaparHTML, uid, esperar, descargar, copiar, autoAlto, extraerJSON, extraerBloque, pareceHTML, envolverHTML, extraerArtefacto, entregaDe, reglasEntrega, esBuilder, extraerTextoDeHTML, forzarTextoPlano, resumir, ahoraCorto, pintarMenciones, rolDe, avHTML, modeloCorto, PLAYBOOK_BUILDER };

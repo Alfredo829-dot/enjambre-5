@@ -230,3 +230,12 @@ table.metricas th{color:var(--m);font-weight:600;font-size:11px}
 .paso.run, .paso.fail{border-color:color-mix(in srgb,var(--c, var(--a)) 55%, var(--b))}
 .paso.fail>summary{color:#fecaca}
 .paso.run .paso-cuerpo pre:not(:empty)::after{content:"▍";color:var(--c,var(--a));animation:pulso 1s ease-in-out infinite}
+
+.previa-tit{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.previa-tit .linkish{background:none;border:0;color:var(--a,#7c3aed);font:inherit;font-size:13px;font-weight:600;cursor:pointer;min-height:32px}
+.previa iframe{height:min(70dvh, 640px);background:#0b0b12}
+.visor.previa-full{padding:0;display:flex;flex-direction:column;background:#000}
+.visor.previa-full .previa-full-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px calc(10px + env(safe-area-inset-top));background:#14141f;border-bottom:1px solid var(--b,#2a2a3d);flex:0 0 auto}
+.visor.previa-full iframe{flex:1 1 auto;width:100%;height:auto;border:0;background:#0b0b12;min-height:0}
+.pub-est{margin:8px 0 0;font-size:13px;overflow-wrap:anywhere}
+.pub-est a{color:#86efac}

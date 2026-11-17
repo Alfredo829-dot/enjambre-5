@@ -69,6 +69,7 @@ const Llaves = {
       try {
         const j = await this.descifrar(pin);
         const n = this.aplicar(j);
+        await this.cargarGithub(pin);
         m.remove();
         toast('🔓 Listo: ' + n + ' llaves de Groq' + (j.puente ? ' y puente Clow/Hermes' : ''));
         document.dispatchEvent(new Event('e5-llaves'));
@@ -97,4 +98,93 @@ const Llaves = {
     };
     setTimeout(() => $('#pinInput') && $('#pinInput').focus(), 80);
   },
+
+  async cifrarConPin(pin, obj) {
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const enc = new TextEncoder();
+    const base = await crypto.subtle.importKey('raw', enc.encode(pin), 'PBKDF2', false, ['deriveKey']);
+    const clave = await crypto.subtle.deriveKey(
+      { name: 'PBKDF2', salt, iterations: 250000, hash: 'SHA-256' },
+      base, { name: 'AES-GCM', length: 256 }, false, ['encrypt']
+    );
+    const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, clave, enc.encode(JSON.stringify(obj)));
+    const b64 = buf => btoa(String.fromCharCode(...new Uint8Array(buf)));
+    return { v: 1, alg: 'AES-256-GCM', kdf: 'PBKDF2-SHA256', iter: 250000, salt: b64(salt), iv: b64(iv), ct: b64(ct) };
+  },
+  async descifrarBlob(pin, d) {
+    const enc = new TextEncoder();
+    const base = await crypto.subtle.importKey('raw', enc.encode(pin), 'PBKDF2', false, ['deriveKey']);
+    const clave = await crypto.subtle.deriveKey(
+      { name: 'PBKDF2', salt: this.b64(d.salt), iterations: d.iter, hash: 'SHA-256' },
+      base, { name: 'AES-GCM', length: 256 }, false, ['decrypt']
+    );
+    const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: this.b64(d.iv) }, clave, this.b64(d.ct));
+    return JSON.parse(new TextDecoder().decode(pt));
+  },
+  async cargarGithub(pin) {
+    const raw = localStorage.getItem('e5_gh.enc');
+    if (!raw) return false;
+    try {
+      const j = await this.descifrarBlob(pin, JSON.parse(raw));
+      if (j && j.github) {
+        const k = AI.claves();
+        k.github = j.github;
+        AI.guardarClaves(k);
+        return true;
+      }
+    } catch (e) {}
+    return false;
+  },
+  async guardarGithub(pin, token) {
+    const tok = String(token || '').trim();
+    if (!tok) throw new Error('Falta el token');
+    const blob = await this.cifrarConPin(pin, { github: tok });
+    localStorage.setItem('e5_gh.enc', JSON.stringify(blob));
+    const k = AI.claves();
+    k.github = tok;
+    AI.guardarClaves(k);
+  },
+  borrarGithub() {
+    localStorage.removeItem('e5_gh.enc');
+    const k = AI.claves();
+    delete k.github;
+    AI.guardarClaves(k);
+  },
+  pedirGithub(alGuardar) {
+    if ($('#ghModal')) return;
+    const m = document.createElement('div');
+    m.className = 'visor centrado';
+    m.id = 'ghModal';
+    m.innerHTML = `<div class="visor-caja panel"><div class="titulo">Token de GitHub</div>
+      <p class="hint">Se guarda cifrado en este teléfono con tu PIN, nunca en el repo. Debe poder crear repos, subir archivos y disparar Actions (alcances <code>repo</code> y <code>workflow</code>). No lo compartas.</p>
+      <input type="password" id="ghToken" placeholder="ghp_… o github_pat_…" autocomplete="off" style="width:100%;margin:8px 0">
+      <input type="password" id="ghPin" inputmode="numeric" maxlength="6" placeholder="PIN de 6 números" autocomplete="off" style="width:100%;margin:8px 0;letter-spacing:8px;text-align:center">
+      <div class="estado" id="ghEstado"></div>
+      <div class="grid2"><button class="primario" id="ghOk" type="button">Guardar</button><button id="ghNo" type="button">Cancelar</button></div></div>`;
+    document.body.appendChild(m);
+    $('#ghNo').onclick = () => m.remove();
+    $('#ghOk').onclick = async () => {
+      const tok = $('#ghToken').value.trim();
+      const pin = $('#ghPin').value.trim();
+      const est = $('#ghEstado');
+      if (!tok) { est.textContent = 'Pega el token'; est.className = 'estado err'; return; }
+      if (!/^\d{6}$/.test(pin)) { est.textContent = 'El PIN son 6 números'; est.className = 'estado err'; return; }
+      $('#ghOk').disabled = true;
+      est.textContent = 'Cifrando…'; est.className = 'estado';
+      try {
+        await this.guardarGithub(pin, tok);
+        m.remove();
+        toast('Token de GitHub guardado en este teléfono');
+        if (alGuardar) alGuardar();
+        document.dispatchEvent(new Event('e5-llaves'));
+      } catch (e) {
+        $('#ghOk').disabled = false;
+        est.textContent = e.message || 'No se pudo guardar';
+        est.className = 'estado err';
+      }
+    };
+    setTimeout(() => $('#ghToken') && $('#ghToken').focus(), 80);
+  },
+
 };
