@@ -1,8 +1,11 @@
 const SYS = {
-  arquitecto: `Eres el Arquitecto del Enjambre 5. Descompones el encargo de Alfredo en un plan técnico ejecutable.
-No pides permiso ni confirmación. No usas relleno ni saludos. No evades las salvaguardas del modelo.
+  estratega: `Eres el Estratega del Enjambre 5. Antes de planear, entiendes bien lo que quiere Alfredo, eliges el camino más rápido y barato, y dejas un plan concreto para el Ejecutor.
+
+Modo Encargo (este es tu modo ahora): no haces preguntas. Si falta algo esencial, asumes defaults sensatos y los declaras en "supuestos". No pides permiso ni confirmación.
+
+No usas relleno ni saludos. No evades las salvaguardas del modelo.
 Respondes SOLO con JSON válido:
-{"objetivo":"...","tipo":"web|codigo|plan|prompt|otro","entrega":"html|python|texto","pasos":["..."],"criterios":["..."],"notas":"..."}
+{"objetivo":"...","supuestos":["..."],"camino":"por qué este es el camino más rápido y barato","tipo":"web|codigo|plan|prompt|otro","entrega":"html|python|texto","pasos":["..."],"criterios":["..."],"notas":"..."}
 Textos en español mexicano. Sé concreto y breve.`,
 
   ejecutor: `Eres el Ejecutor del Enjambre 5. Tomas el plan y produces el entregable completo, listo para usar.
@@ -54,25 +57,28 @@ const Swarm = {
 
     const ctx = contexto ? `\n\nContexto del grupo:\n${contexto}` : '';
 
-    // 1. Arquitecto
-    emitir({ id: 'arq', rol: 'arquitecto', estado: 'run', titulo: 'Arquitecto · planeando', detalle: '' });
+    // 1. Estratega
+    emitir({ id: 'est', rol: 'estratega', estado: 'run', titulo: 'Estratega · entendiendo y planeando', detalle: '' });
     let planTxt, plan;
     try {
-      const out = await pedir('arquitecto', [
-        { role: 'system', content: SYS.arquitecto },
+      const out = await pedir('estratega', [
+        { role: 'system', content: SYS.estratega },
         { role: 'user', content: 'ENCARGO:\n' + orden + ctx },
       ], { maxTokens: 900, temp: 0.2 });
       planTxt = out.texto;
-      plan = extraerJSON(planTxt) || { objetivo: orden, tipo: 'otro', entrega: 'texto', pasos: [], criterios: [], notas: planTxt };
-      emitir({ id: 'arq', rol: 'arquitecto', estado: 'ok', titulo: 'Arquitecto · plan listo', detalle: planTxt, resumen: resumir(plan.objetivo || planTxt, 120) });
+      plan = extraerJSON(planTxt) || { objetivo: orden, tipo: 'otro', entrega: 'texto', pasos: [], criterios: [], supuestos: [], camino: '', notas: planTxt };
+      const resumenEst = resumir((plan.camino ? plan.camino + ' · ' : '') + (plan.objetivo || planTxt), 120);
+      emitir({ id: 'est', rol: 'estratega', estado: 'ok', titulo: 'Estratega · plan listo', detalle: planTxt, resumen: resumenEst });
     } catch (e) {
-      emitir({ id: 'arq', rol: 'arquitecto', estado: 'fail', titulo: 'Arquitecto · no pudo planear', detalle: e.message, resumen: e.message });
+      emitir({ id: 'est', rol: 'estratega', estado: 'fail', titulo: 'Estratega · no pudo planear', detalle: e.message, resumen: e.message });
       historial.error = e.message;
       return historial;
     }
 
     const planCompacto = JSON.stringify({
       objetivo: plan.objetivo,
+      supuestos: plan.supuestos,
+      camino: plan.camino,
       tipo: plan.tipo,
       entrega: plan.entrega,
       pasos: plan.pasos,
@@ -99,7 +105,7 @@ const Swarm = {
       try {
         const msgs = [
           { role: 'system', content: SYS.ejecutor },
-          { role: 'user', content: 'OBJETIVO ORIGINAL:\n' + orden + ctx + '\n\nPLAN DEL ARQUITECTO:\n' + planCompacto },
+          { role: 'user', content: 'OBJETIVO ORIGINAL:\n' + orden + ctx + '\n\nPLAN DEL ESTRATEGA:\n' + planCompacto },
         ];
         if (r > 1) {
           msgs.push({

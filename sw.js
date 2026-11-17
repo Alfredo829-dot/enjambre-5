@@ -1,8 +1,10 @@
-const V = 'enjambre5-v2';
+const V = 'enjambre5-v3';
 const BASE = [
   './', 'index.html', 'css/style.css',
   'js/util.js', 'js/keys.js', 'js/ai.js', 'js/swarm.js', 'js/grupo.js', 'js/app.js',
-  'manifest.json', 'icons/icon-192.png', 'icons/icon-512.png'
+  'manifest.json', 'icons/icon-192.png', 'icons/icon-512.png',
+  'img/col-estratega.webp', 'img/col-ejecutor.webp', 'img/col-critico.webp', 'img/col-expansor.webp', 'img/col-controlador.webp',
+  'img/av-estratega.webp', 'img/av-ejecutor.webp', 'img/av-critico.webp', 'img/av-expansor.webp', 'img/av-controlador.webp'
 ];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(V).then(c => c.addAll(BASE)));

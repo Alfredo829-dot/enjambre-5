@@ -1,20 +1,23 @@
 const ROLES = {
-  arquitecto: {
-    id: 'arquitecto',
-    nombre: 'Arquitecto',
-    corto: 'Planifica',
-    inicial: 'Ar',
-    mention: ['arquitecto', 'architect'],
+  estratega: {
+    id: 'estratega',
+    nombre: 'Estratega',
+    corto: 'Elige el camino más corto',
+    inicial: 'Es',
+    mention: ['estratega', 'strategist', 'arquitecto', 'architect'],
     modeloPref: 'openai/gpt-oss-120b',
     respaldo: 'openai/gpt-oss-20b',
     keyPref: ['groq', 'groq3', 'groq2'],
     razonamiento: 'low',
     color: '#8b5cf6',
+    fw: 288,
+    col: 'img/col-estratega.webp',
+    av: 'img/av-estratega.webp',
   },
   ejecutor: {
     id: 'ejecutor',
     nombre: 'Ejecutor',
-    corto: 'Hace el trabajo',
+    corto: 'Hace el trabajo, listo para usar',
     inicial: 'Ej',
     mention: ['ejecutor', 'executor'],
     modeloPref: 'qwen/qwen3.8-27b',
@@ -22,11 +25,14 @@ const ROLES = {
     keyPref: ['groq2', 'groq', 'groq3'],
     razonamiento: 'none',
     color: '#22c55e',
+    fw: 232,
+    col: 'img/col-ejecutor.webp',
+    av: 'img/av-ejecutor.webp',
   },
   critico: {
     id: 'critico',
     nombre: 'Crítico',
-    corto: 'Caza fallos',
+    corto: 'Caza fallos y no suaviza',
     inicial: 'Cr',
     mention: ['crítico', 'critico', 'analista', 'qa', 'critic'],
     modeloPref: 'openai/gpt-oss-120b',
@@ -34,11 +40,14 @@ const ROLES = {
     keyPref: ['groq3', 'groq', 'groq2'],
     razonamiento: 'low',
     color: '#f97316',
+    fw: 237,
+    col: 'img/col-critico.webp',
+    av: 'img/av-critico.webp',
   },
   expansor: {
     id: 'expansor',
     nombre: 'Expansor',
-    corto: 'Pule y añade extras',
+    corto: 'Pule y añade extras útiles',
     inicial: 'Ex',
     mention: ['expansor', 'creativo'],
     modeloPref: 'allam-2-7b',
@@ -46,11 +55,14 @@ const ROLES = {
     keyPref: ['groq', 'groq2', 'groq3'],
     razonamiento: null,
     color: '#ec4899',
+    fw: 220,
+    col: 'img/col-expansor.webp',
+    av: 'img/av-expansor.webp',
   },
   controlador: {
     id: 'controlador',
     nombre: 'Controlador',
-    corto: 'Coordina y entrega',
+    corto: 'Coordina y te entrega el resultado',
     inicial: 'Co',
     mention: ['controlador', 'sincronizador', 'sync'],
     modeloPref: 'openai/gpt-oss-20b',
@@ -58,10 +70,13 @@ const ROLES = {
     keyPref: ['groq2', 'groq3', 'groq'],
     razonamiento: 'low',
     color: '#38bdf8',
+    fw: 217,
+    col: 'img/col-controlador.webp',
+    av: 'img/av-controlador.webp',
   },
 };
 
-const ORDEN_ROLES = ['arquitecto', 'ejecutor', 'critico', 'expansor', 'controlador'];
+const ORDEN_ROLES = ['estratega', 'ejecutor', 'critico', 'expansor', 'controlador'];
 
 const AI = {
   claves() { try { return JSON.parse(localStorage.getItem('e5_claves') || '{}'); } catch (e) { return {}; } },

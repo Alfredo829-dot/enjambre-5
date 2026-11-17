@@ -5,6 +5,7 @@ const App = {
   encargos: [],
   grupo: [],
   pasosUI: {},
+  estadoRol: {},
 
   cargar() {
     try { this.encargos = JSON.parse(localStorage.getItem('e5_encargos') || '[]'); } catch (e) { this.encargos = []; }
@@ -63,11 +64,54 @@ const App = {
   },
   insertarMencion(id) {
     const ta = $('#cajaIn');
-    const tag = id === 'todos' ? '@todos ' : '@' + ROLES[id].nombre + ' ';
+    const tag = id === 'todos' ? '@todos ' : '@' + rolDe(id).nombre + ' ';
     const start = ta.selectionStart || ta.value.length;
     ta.value = ta.value.slice(0, start) + tag + ta.value.slice(ta.selectionEnd || start);
     autoAlto(ta);
     ta.focus();
+  },
+
+  pintarEquipo() {
+    const c = $('#equipoFoto');
+    if (!c) return;
+    c.innerHTML = ORDEN_ROLES.map(id => {
+      const r = ROLES[id];
+      const st = this.estadoRol[id] || 'listo';
+      const trab = (st === 'pensando' || st === 'escribiendo') ? ' trabajando' : '';
+      const stTxt = st === 'pensando' ? 'pensando…' : st === 'escribiendo' ? 'escribiendo…' : '';
+      return `<button type="button" class="bot-col${trab}" data-rol="${id}" style="--c:${r.color}" aria-label="${escaparHTML(r.nombre + ', ' + r.corto)}">
+        <span class="bot-frame"><img src="${r.col}" alt=""></span>
+        <span class="bot-meta">
+          <span class="bot-nom">${escaparHTML(r.nombre)}</span>
+          <span class="bot-linea"></span>
+          <span class="bot-st" data-st="${st}">${escaparHTML(stTxt)}</span>
+        </span>
+      </button>`;
+    }).join('');
+    $$('#equipoFoto .bot-col').forEach(b => {
+      b.onclick = () => this.tocarBot(b.dataset.rol);
+    });
+  },
+  setEstadoRol(id, st) {
+    id = (id === 'arquitecto') ? 'estratega' : id;
+    if (id && ROLES[id]) this.estadoRol[id] = st;
+    const col = id && $(`#equipoFoto .bot-col[data-rol="${id}"]`);
+    if (!col) return;
+    const on = st === 'pensando' || st === 'escribiendo';
+    col.classList.toggle('trabajando', on);
+    const el = col.querySelector('.bot-st');
+    if (el) {
+      el.dataset.st = st;
+      el.textContent = st === 'pensando' ? 'pensando…' : st === 'escribiendo' ? 'escribiendo…' : '';
+    }
+  },
+  resetEstados() {
+    ORDEN_ROLES.forEach(id => this.setEstadoRol(id, 'listo'));
+  },
+  tocarBot(id) {
+    const r = rolDe(id);
+    if (this.modo === 'grupo') this.insertarMencion(id);
+    else toast(r.nombre + ' · ' + r.corto);
   },
 
   pintarEncargos() {
@@ -77,6 +121,8 @@ const App = {
     lista.innerHTML = '';
     vacio.hidden = this.encargos.length > 0;
     ideas.hidden = this.encargos.length > 0;
+    const cab = $('#encCab');
+    if (cab) cab.hidden = this.encargos.length > 0;
     this.encargos.forEach(run => lista.appendChild(this.nodoEncargo(run, false)));
   },
 
@@ -100,10 +146,11 @@ const App = {
     return d;
   },
   nodoPaso(p) {
+    const r = rolDe(p.rol);
     const d = document.createElement('details');
     d.className = 'paso ' + (p.estado || '');
     d.dataset.pid = p.id;
-    d.innerHTML = `<summary><span class="punto"></span><span class="cm-av av-${p.rol}" style="width:22px;height:22px;font-size:9px">${escaparHTML((ROLES[p.rol] || {}).inicial || '?')}</span><span>${escaparHTML(p.titulo || p.rol)}</span>${p.resumen ? `<span class="resumen">${escaparHTML(p.resumen)}</span>` : ''}</summary><div class="paso-cuerpo"><pre>${escaparHTML(p.detalle || '…')}</pre></div>`;
+    d.innerHTML = `<summary>${avHTML(p.rol, 'av-sm')}<span class="punto"></span><span>${escaparHTML(p.titulo || r.nombre)}</span>${p.resumen ? `<span class="resumen">${escaparHTML(p.resumen)}</span>` : ''}</summary><div class="paso-cuerpo"><pre>${escaparHTML(p.detalle || '…')}</pre></div>`;
     return d;
   },
   actualizarPaso(runId, paso) {
@@ -160,28 +207,24 @@ const App = {
     const vacio = $('#grpVacio');
     lista.innerHTML = '';
     vacio.hidden = this.grupo.length > 0;
+    const cab = $('#grpCab');
+    if (cab) cab.hidden = this.grupo.length > 0;
     this.grupo.forEach(m => lista.appendChild(this.nodoMsg(m)));
-    this.pintarMiembros();
     this.syncPromover();
-  },
-  pintarMiembros() {
-    const c = $('#grpMiembros');
-    c.innerHTML = ORDEN_ROLES.map(id => {
-      const r = ROLES[id];
-      return `<div class="miembro" title="${escaparHTML(r.nombre + ' · ' + r.corto)}"><div class="cm-av av-${id}">${r.inicial}</div><span>${escaparHTML(r.nombre)}</span></div>`;
-    }).join('');
   },
   nodoMsg(m) {
     const el = document.createElement('article');
     const esYo = m.rol === 'alfredo';
-    el.className = 'cm ' + (esYo ? 'yo r-alfredo' : 'r-' + m.rol) + (m.temp ? ' trabajando' : '');
+    const r = esYo ? null : rolDe(m.rol);
+    el.className = 'cm ' + (esYo ? 'yo r-alfredo' : 'r-' + (r.id || m.rol)) + (m.temp ? ' trabajando' : '');
     el.dataset.mid = m.id || '';
-    const nom = esYo ? 'Alfredo' : (ROLES[m.rol] || {}).nombre || m.rol;
-    const ini = esYo ? 'Al' : (ROLES[m.rol] || {}).inicial || '?';
-    const rol = esYo ? 'tú' : ((ROLES[m.rol] || {}).corto || '');
-    const avCls = esYo ? 'av-alfredo' : 'av-' + m.rol;
-    const cuerpo = m.temp ? 'está escribiendo…' : pintarMenciones(m.texto || '');
-    el.innerHTML = `<div class="cm-meta"><span class="cm-av ${avCls}">${ini}</span><span class="cm-nom">${escaparHTML(nom)}</span><span class="cm-rol">${escaparHTML(rol)}</span></div><div class="cm-t">${cuerpo}</div>`;
+    const nom = esYo ? 'Alfredo' : (r && r.nombre) || m.rol;
+    const rol = esYo ? 'tú' : ((r && r.corto) || '');
+    const badge = (!esYo && !m.temp && (m.modelo || (r && r.modeloPref))) ? `<span class="cm-badge">${escaparHTML(modeloCorto(m.rol))}</span>` : '';
+    const cuerpo = m.temp
+      ? `<span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>pensando…`
+      : pintarMenciones(m.texto || '');
+    el.innerHTML = `<div class="cm-meta">${avHTML(esYo ? 'alfredo' : m.rol)}<span class="cm-nom">${escaparHTML(nom)}</span><span class="cm-rol">${escaparHTML(rol)}${badge ? '<br>' + badge : ''}</span></div><div class="cm-t">${cuerpo}</div>`;
     return el;
   },
 
@@ -226,6 +269,7 @@ const App = {
     this.ocupado = true;
     this.ctrl = new AbortController();
     $('#cajaEnviar').disabled = true;
+    this.resetEstados();
     const run = {
       id: uid(), when: Date.now(), orden: texto, contexto: contexto || '',
       pasos: [], resultado: '', artefacto: null, error: null, veredictos: [], rondas: 0, modelos: {},
@@ -233,6 +277,8 @@ const App = {
     this.encargos.push(run);
     $('#encVacio').hidden = true;
     $('#encIdeas').hidden = true;
+    const cab = $('#encCab');
+    if (cab) cab.hidden = true;
     const lista = $('#encLista');
     lista.appendChild(this.nodoEncargo(run, true));
     this.alFinal();
@@ -249,6 +295,12 @@ const App = {
             if (i >= 0) run.pasos[i] = paso;
           } else run.pasos.push(paso);
           this.actualizarPaso(run.id, paso);
+          ORDEN_ROLES.forEach(id => {
+            const activo = rolDe(paso.rol).id === id && paso.estado === 'run';
+            this.setEstadoRol(id, activo ? 'pensando' : (this.estadoRol[id] === 'pensando' && rolDe(paso.rol).id === id ? 'listo' : this.estadoRol[id]));
+          });
+          if (paso.estado === 'run') this.setEstadoRol(paso.rol, 'pensando');
+          else this.setEstadoRol(paso.rol, 'listo');
           this.alFinal();
         },
       });
@@ -265,6 +317,7 @@ const App = {
       run.error = e.message || String(e);
       window.__e5ultimoEncargo = { error: run.error };
     }
+    this.resetEstados();
     const card = $('#run-' + run.id);
     const viejo = card && card.querySelector('.resultado');
     if (viejo) viejo.remove();
@@ -281,9 +334,12 @@ const App = {
     this.ocupado = true;
     this.ctrl = new AbortController();
     $('#cajaEnviar').disabled = true;
+    this.resetEstados();
     const yo = { id: uid(), when: Date.now(), rol: 'alfredo', texto };
     this.grupo.push(yo);
     $('#grpVacio').hidden = true;
+    const cab = $('#grpCab');
+    if (cab) cab.hidden = true;
     $('#grpLista').appendChild(this.nodoMsg(yo));
     this.alFinal();
     const temps = {};
@@ -293,12 +349,14 @@ const App = {
       await Grupo.responder(texto, this.grupo.filter(m => !m.temp), {
         signal: this.ctrl.signal,
         onInicio: (id) => {
+          this.setEstadoRol(id, 'pensando');
           const tmp = { id: 'tmp-' + id, rol: id, texto: '', temp: true };
           temps[id] = tmp;
           $('#grpLista').appendChild(this.nodoMsg(tmp));
           this.alFinal();
         },
         onListo: (item) => {
+          this.setEstadoRol(item.rol, 'listo');
           const tmp = temps[item.rol];
           if (tmp) {
             const n = $('#grpLista').querySelector(`[data-mid="${tmp.id}"]`);
@@ -312,6 +370,7 @@ const App = {
           this.alFinal();
         },
         onError: (item) => {
+          this.setEstadoRol(item.rol, 'listo');
           const tmp = temps[item.rol];
           if (tmp) {
             const n = $('#grpLista').querySelector(`[data-mid="${tmp.id}"]`);
@@ -328,6 +387,7 @@ const App = {
     } catch (e) {
       toast(e.message || 'Error en el grupo');
     }
+    this.resetEstados();
     this.ocupado = false;
     this.ctrl = null;
     $('#cajaEnviar').disabled = false;
@@ -370,7 +430,7 @@ const Ajustes = {
     if (Llaves.hay && !AI.nLlaves()) {
       const b = document.createElement('button');
       b.className = 'ancho primario';
-      b.textContent = '🔑 Desbloquear mis llaves con PIN';
+      b.textContent = '🔑 Desbloquear mis llaves con el PIN';
       b.onclick = () => Llaves.pedir(true);
       caja.appendChild(b);
     } else if (AI.nLlaves()) {
@@ -396,17 +456,23 @@ const Ajustes = {
     ul.innerHTML = ORDEN_ROLES.map(id => {
       const r = ROLES[id];
       const mod = AI.modeloDe[id] || r.modeloPref;
-      return `<li><span class="cm-av av-${id}">${r.inicial}</span><div><b>${escaparHTML(r.nombre)}</b> · ${escaparHTML(r.corto)}<br><span class="muted">${escaparHTML(mod)}</span></div></li>`;
+      return `<li>${avHTML(id)}<div><b>${escaparHTML(r.nombre)}</b> · ${escaparHTML(r.corto)}<br><span class="muted">${escaparHTML(mod)}</span></div></li>`;
     }).join('');
   },
 };
 
 function red() { $('#avisoRed').hidden = navigator.onLine; }
 
+function syncCompacto() {
+  const bar = $('#equipoBar');
+  if (!bar || document.body.classList.contains('ajustes')) return;
+  bar.classList.toggle('compacto', window.scrollY > 40);
+}
+
 window.addEventListener('DOMContentLoaded', async () => {
   App.cargar();
   App.ideas();
-  App.pintarMiembros();
+  App.pintarEquipo();
   App.pintarEncargos();
   App.pintarGrupo();
   $$('.modos button').forEach(b => b.onclick = () => App.ir(b.dataset.modo));
@@ -438,6 +504,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   };
   window.addEventListener('online', red);
   window.addEventListener('offline', red);
+  window.addEventListener('scroll', syncCompacto, { passive: true });
   red();
   document.addEventListener('e5-llaves', async () => {
     Ajustes.pintar();

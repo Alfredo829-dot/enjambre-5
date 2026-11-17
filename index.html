@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="theme-color" content="#0f1115">
+<meta name="theme-color" content="#07040f">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="description" content="Cinco agentes de IA coordinados: Encargo y chat en grupo, desde tu celular.">
 <title>Enjambre 5</title>
@@ -29,13 +29,17 @@
   <button type="button" data-modo="grupo">Grupo</button>
 </nav>
 
+<section class="equipo-bar" id="equipoBar" aria-label="Los 5 agentes">
+  <div class="equipo-foto" id="equipoFoto"></div>
+</section>
+
 <div class="aviso" id="avisoRed" hidden>📡 Sin internet: puedes leer lo guardado en este teléfono. El enjambre vuelve cuando te conectes.</div>
 
 <main>
   <section id="vista-encargo" class="vista activo">
-    <div class="cab-modo">
+    <div class="cab-modo" id="encCab">
       <b>Encargo</b>
-      <p class="muted">Escribes una orden. Los 5 agentes la resuelven entre ellos y a ti solo te llega el resultado listo.</p>
+      <p class="muted">Escribes una orden. El Estratega elige el camino, los 5 la resuelven entre ellos y a ti solo te llega el resultado listo.</p>
     </div>
     <div class="vacio" id="encVacio">
       <b>¿Qué armamos?</b>
@@ -46,10 +50,9 @@
   </section>
 
   <section id="vista-grupo" class="vista">
-    <div class="miembros" id="grpMiembros" aria-label="Integrantes del grupo"></div>
-    <div class="cab-modo corta">
+    <div class="cab-modo corta" id="grpCab">
       <b>Grupo</b>
-      <p class="muted">Chat tipo WhatsApp: cada agente responde por su cuenta. Usa @para hablarle a uno o a @todos.</p>
+      <p class="muted">Toca a un agente para mencionarlo, o escribe @todos. Cada uno responde por su cuenta.</p>
     </div>
     <div class="vacio" id="grpVacio">
       <b>El grupo está en silencio</b>

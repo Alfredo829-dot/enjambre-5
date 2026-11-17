@@ -106,4 +106,27 @@ function pintarMenciones(texto) {
   return escaparHTML(texto).replace(/@([A-Za-zÁÉÍÓÚáéíóúüÜñÑ]+)/g, '<span class="menc">@$1</span>');
 }
 
-window.Util = { toast, escaparHTML, uid, esperar, descargar, copiar, autoAlto, extraerJSON, extraerBloque, pareceHTML, envolverHTML, extraerArtefacto, resumir, ahoraCorto, pintarMenciones };
+
+function rolDe(id) {
+  if (id === 'arquitecto') id = 'estratega';
+  return (typeof ROLES !== 'undefined' && ROLES[id]) ? ROLES[id] : { id: id || '?', nombre: id || '?', inicial: '?', corto: '', color: '#888' };
+}
+
+function avHTML(rol, extraCls) {
+  const extra = extraCls ? ' ' + extraCls : '';
+  if (rol === 'alfredo') {
+    return '<span class="av av-alfredo' + extra + '">Al</span>';
+  }
+  const r = rolDe(rol);
+  const cls = ('av av-' + r.id + extra).trim();
+  if (r.av) return '<span class="' + cls + '" style="--c:' + r.color + '"><img src="' + r.av + '" alt=""></span>';
+  return '<span class="' + cls + '" style="--c:' + r.color + '">' + escaparHTML(r.inicial || '?') + '</span>';
+}
+
+function modeloCorto(rol) {
+  const r = rolDe(rol);
+  const m = ((typeof AI !== 'undefined' && AI.modeloDe && AI.modeloDe[r.id]) || r.modeloPref || '');
+  return String(m).split('/').pop();
+}
+
+window.Util = { toast, escaparHTML, uid, esperar, descargar, copiar, autoAlto, extraerJSON, extraerBloque, pareceHTML, envolverHTML, extraerArtefacto, resumir, ahoraCorto, pintarMenciones, rolDe, avHTML, modeloCorto };
