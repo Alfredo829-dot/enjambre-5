@@ -14,7 +14,7 @@ const App = {
   guardarEncargos() {
     const recorte = this.encargos.slice(-30).map(e => ({
       id: e.id, when: e.when, orden: e.orden, resultado: e.resultado,
-      artefacto: e.artefacto, error: e.error, veredictos: e.veredictos,
+      artefacto: e.artefacto, entrega: e.entrega, error: e.error, veredictos: e.veredictos,
       rondas: e.rondas, pasos: (e.pasos || []).map(p => ({
         id: p.id, rol: p.rol, estado: p.estado, titulo: p.titulo,
         resumen: p.resumen, detalle: String(p.detalle || '').slice(0, 4000),
@@ -164,11 +164,12 @@ const App = {
   nodoResultado(run) {
     const box = document.createElement('div');
     box.className = 'resultado' + (run.error && !run.resultado ? ' err' : '');
-    const art = run.artefacto || extraerArtefacto(run.resultado || '');
+    const entrega = run.entrega || (run.artefacto && run.artefacto.tipo) || '';
+    const art = run.artefacto && run.artefacto.tipo ? run.artefacto : extraerArtefacto(run.resultado || '', entrega);
     const k = run.error && !run.resultado ? 'NO SE PUDO COMPLETAR' : 'RESULTADO';
-    const texto = run.resultado || run.error || '';
+    const texto = (art && art.tipo === 'texto' && art.contenido) ? art.contenido : (run.resultado || run.error || '');
     box.innerHTML = `<div class="k">${k}</div><div class="t">${escaparHTML(texto)}</div>`;
-    if (art && art.tipo === 'html' && art.contenido) {
+    if (art && art.tipo === 'html' && entrega !== 'texto' && art.contenido) {
       const prev = document.createElement('div');
       prev.className = 'previa';
       prev.innerHTML = `<div class="previa-tit">Vista previa</div>`;
@@ -195,7 +196,7 @@ const App = {
       bDesc.onclick = () => descargar(art.contenido, 'enjambre-5.py', 'text/x-python;charset=utf-8');
     } else {
       bDesc.textContent = '⬇ Descargar .txt';
-      bDesc.onclick = () => descargar(texto, 'enjambre-5.txt');
+      bDesc.onclick = () => descargar(art && art.contenido ? art.contenido : texto, 'enjambre-5.txt');
     }
     bts.appendChild(bDesc);
     box.appendChild(bts);
@@ -305,13 +306,14 @@ const App = {
         },
       });
       Object.assign(run, {
-        resultado: hist.resultado, artefacto: hist.artefacto, error: hist.error,
+        resultado: hist.resultado, artefacto: hist.artefacto, entrega: hist.entrega, error: hist.error,
         veredictos: hist.veredictos, rondas: hist.rondas, modelos: hist.modelos, pasos: hist.pasos, ms: hist.ms,
       });
       window.__e5ultimoEncargo = {
         id: run.id, rondas: run.rondas, veredictos: (run.veredictos || []).map(v => v.veredicto),
-        fallos: run.veredictos, tipo: (run.artefacto || {}).tipo, error: run.error,
+        fallos: run.veredictos, tipo: (run.artefacto || {}).tipo, entrega: run.entrega, error: run.error,
         modelos: run.modelos, tieneResultado: !!run.resultado, ms: run.ms,
+        preview: String((run.artefacto && run.artefacto.contenido) || run.resultado || '').slice(0, 400),
       };
     } catch (e) {
       run.error = e.message || String(e);

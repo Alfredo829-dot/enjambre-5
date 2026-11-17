@@ -81,7 +81,86 @@ function envolverHTML(frag) {
   return `<!doctype html><html lang="es-MX"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Enjambre 5</title><style>body{font-family:system-ui,sans-serif;margin:16px;background:#111;color:#eee}</style></head><body>${t}</body></html>`;
 }
 
-function extraerArtefacto(texto) {
+function entregaDe(plan, orden) {
+  const raw = String((plan && (plan.entrega || plan.tipo)) || '').toLowerCase().trim();
+  let e = raw;
+  if (['htm', 'web', 'webpage', 'pagina', 'página', 'app', 'sitio'].includes(e)) e = 'html';
+  if (e === 'py') e = 'python';
+  if (e === 'plan' || e === 'prompt' || e === 'copy' || e === 'otro') e = 'texto';
+  if (e !== 'html' && e !== 'python' && e !== 'texto') e = 'texto';
+  const o = String(orden || '');
+  const pideApp = /\b(html|css|app web|página web|pagina web|sitio web|web app|aplicación web|aplicacion web|interfaz|localStorage)\b/i.test(o);
+  const pidePy = /\b(python|\.py\b|script de python)\b/i.test(o);
+  const pideTexto = /\b(haiku|poema|poesía|poesia|copy\b|eslogan|slogan|lista de|nombres para|prompt\b|plan de|guion|guión|mensaje[s]? listo|carta\b)\b/i.test(o);
+  if (pideTexto && !pideApp && !pidePy) return 'texto';
+  if (e === 'html' || e === 'python') return e;
+  if (pideApp) return 'html';
+  if (pidePy) return 'python';
+  return e;
+}
+
+function reglasEntrega(entrega) {
+  if (entrega === 'html') {
+    return 'FORMATO OBLIGATORIO: app o página web. Entrega un HTML completo, autónomo, móvil, en un bloque ```html. CSS incluido. Sin librerías de pago.';
+  }
+  if (entrega === 'python') {
+    return 'FORMATO OBLIGATORIO: un script de Python completo en un bloque ```python, solo con la biblioteca estándar.';
+  }
+  return 'FORMATO OBLIGATORIO: texto plano (se permite markdown). NUNCA lo envuelvas en HTML, CSS ni en una página o app. NUNCA agregues <!doctype>, <html>, <style> ni una interfaz. Entrega solo el texto pedido, listo para copiar.';
+}
+
+function extraerTextoDeHTML(html) {
+  const raw = String(html || '');
+  try {
+    const doc = new DOMParser().parseFromString(raw, 'text/html');
+    const pref = doc.querySelector('pre, blockquote, [data-poema], .haiku, .poema, .texto, article');
+    let t = pref ? pref.textContent : ((doc.body && doc.body.innerText) || '');
+    t = String(t || '').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+    if (t.length >= 8) return t;
+  } catch (e) {}
+  return raw
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<[^>]+>/g, '\n')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function forzarTextoPlano(texto) {
+  let s = String(texto || '').trim();
+  if (!s) return s;
+  const fencedHtml = extraerBloque(s, ['html', 'htm', 'xml']);
+  if (fencedHtml && /<\/?[a-z][\s\S]*>/i.test(fencedHtml)) {
+    const extra = extraerTextoDeHTML(fencedHtml);
+    if (extra.length >= 8) return extra;
+  }
+  const html = pareceHTML(s);
+  if (html) {
+    const extra = extraerTextoDeHTML(html);
+    if (extra.length >= 8) return extra;
+  }
+  // Quita una cerca de markdown genérica si envuelve TODO el texto (poema o lista).
+  const onlyFence = s.match(/^```[a-z0-9]*\s*\n([\s\S]*?)\n```$/i);
+  if (onlyFence) s = onlyFence[1].trim();
+  return s;
+}
+
+function extraerArtefacto(texto, entrega) {
+  const e = String(entrega || '').toLowerCase();
+  if (e === 'texto' || e === 'plan' || e === 'prompt' || e === 'copy') {
+    const plano = forzarTextoPlano(texto);
+    return { tipo: 'texto', contenido: plano, texto: plano };
+  }
+  if (e === 'python') {
+    const py = extraerBloque(texto, ['python', 'py']);
+    return { tipo: 'python', contenido: py || String(texto || '').trim(), texto };
+  }
+  if (e === 'html') {
+    const html = pareceHTML(texto);
+    if (html) return { tipo: 'html', contenido: envolverHTML(html), texto };
+    return { tipo: 'html', contenido: envolverHTML(String(texto || '').trim()), texto };
+  }
   const html = pareceHTML(texto);
   if (html) return { tipo: 'html', contenido: envolverHTML(html), texto };
   const py = extraerBloque(texto, ['python', 'py']);
@@ -129,4 +208,4 @@ function modeloCorto(rol) {
   return String(m).split('/').pop();
 }
 
-window.Util = { toast, escaparHTML, uid, esperar, descargar, copiar, autoAlto, extraerJSON, extraerBloque, pareceHTML, envolverHTML, extraerArtefacto, resumir, ahoraCorto, pintarMenciones, rolDe, avHTML, modeloCorto };
+window.Util = { toast, escaparHTML, uid, esperar, descargar, copiar, autoAlto, extraerJSON, extraerBloque, pareceHTML, envolverHTML, extraerArtefacto, entregaDe, reglasEntrega, extraerTextoDeHTML, forzarTextoPlano, resumir, ahoraCorto, pintarMenciones, rolDe, avHTML, modeloCorto };
